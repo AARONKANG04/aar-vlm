@@ -4,6 +4,7 @@
 
 #include "autograd/function.hpp"
 #include "core/tensor.hpp"
+#include "ops/elementwise.hpp"
 
 using namespace vlm;
 
@@ -163,6 +164,25 @@ TEST(Autograd, ChainedGraphPropagatesScaling) {
     auto* p = static_cast<const float*>(x.grad()->data());
     EXPECT_FLOAT_EQ(p[0], 15.0f);
     EXPECT_FLOAT_EQ(p[1], 15.0f);
+}
+
+TEST(Autograd, DeepChainDoesNotOverflowStack) {
+    constexpr int DEPTH = 10000;
+
+    Tensor x = Tensor::empty({1}, DType::Fp32);
+    *static_cast<float*>(x.data()) = 1.0f;
+    x.set_requires_grad(true);
+
+    Tensor y = x;
+    for (int i = 0; i < DEPTH; ++i) {
+        y = add(y, x);
+    }
+
+    sum_all(y).backward();
+
+    auto g = x.grad();
+    ASSERT_NE(g, nullptr);
+    EXPECT_FLOAT_EQ(*static_cast<const float*>(g->data()), static_cast<float>(DEPTH + 1));
 }
 
 TEST(Autograd, NonRequiresGradLeafReceivesNothing) {
