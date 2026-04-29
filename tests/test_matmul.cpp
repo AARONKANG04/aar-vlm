@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <vector>
 
@@ -99,6 +101,9 @@ TEST(Matmul, CudaLargeMatchesCpu) {
 
     auto* cp = static_cast<const float*>(c_cpu.data());
     auto* gp = static_cast<const float*>(c_gpu.data());
-    for (int i = 0; i < M * N; ++i) EXPECT_NEAR(cp[i], gp[i], 1e-3f);
+    for (int i = 0; i < M * N; ++i) {
+        const float tol = 1e-5f * std::max(std::abs(cp[i]), 1.0f) + 1e-6f;
+        EXPECT_NEAR(cp[i], gp[i], tol);
+    }
 #endif
 }
