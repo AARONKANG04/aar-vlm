@@ -81,3 +81,24 @@ TEST(Matmul, CudaMatchesCpu) {
     EXPECT_FLOAT_EQ(p[3], 154.0f);
 #endif
 }
+
+TEST(Matmul, CudaLargeMatchesCpu) {
+#ifndef HAS_CUDA
+    GTEST_SKIP() << "Built without CUDA";
+#else
+    constexpr int M = 64, K = 96, N = 48;
+    Tensor a = Tensor::empty({M, K}, DType::Fp32);
+    Tensor b = Tensor::empty({K, N}, DType::Fp32);
+    auto* ap = static_cast<float*>(a.data());
+    auto* bp = static_cast<float*>(b.data());
+    for (int i = 0; i < M * K; ++i) ap[i] = (i * 0.013f) - 0.4f;
+    for (int i = 0; i < K * N; ++i) bp[i] = (i * 0.007f) + 0.1f;
+
+    Tensor c_cpu = matmul(a, b);
+    Tensor c_gpu = matmul(a.to(Device::CUDA), b.to(Device::CUDA)).to(Device::CPU);
+
+    auto* cp = static_cast<const float*>(c_cpu.data());
+    auto* gp = static_cast<const float*>(c_gpu.data());
+    for (int i = 0; i < M * N; ++i) EXPECT_NEAR(cp[i], gp[i], 1e-3f);
+#endif
+}

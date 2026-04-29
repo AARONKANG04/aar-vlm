@@ -6,14 +6,14 @@
 
 namespace vlm {
     namespace {
-        __global__ void matmul_native_fp32(
+        __global__ void matmul_naive_fp32(
             const float* __restrict__ A,
             const float* __restrict__ B,
             float* __restrict__ C,
             int M, int N, int K
         ) {
-            int row = blockIdx.x * blockDim.y + threadIdx.y;
-            int col = blockIdx.y * blockDim.x + threadIdx.x;
+            int row = blockIdx.y * blockDim.y + threadIdx.y;
+            int col = blockIdx.x * blockDim.x + threadIdx.x;
             if (row >= M || col >= N) return;
 
             float acc = 0.0f;
@@ -37,7 +37,7 @@ namespace vlm {
 
         dim3 block(16, 16);
         dim3 grid((N + block.x - 1) / block.x, (M + block.y - 1) / block.y);
-        matmul_native_fp32<<<grid, block>>>(A, B, C, M, N, K);
+        matmul_naive_fp32<<<grid, block>>>(A, B, C, M, N, K);
         CUDA_CHECK(cudaGetLastError());
         CUDA_CHECK(cudaDeviceSynchronize());
 
