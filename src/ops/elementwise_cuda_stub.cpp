@@ -1,0 +1,17 @@
+#include "ops/elementwise.hpp"
+
+#include <stdexcept>
+
+namespace vlm {
+    Tensor add_cuda(const Tensor&, const Tensor&) {
+        throw std::runtime_error("CUDA support not built; rebuild with CUDA");
+    }
+
+    Tensor mul_cuda(const Tensor&, const Tensor&) {
+        throw std::runtime_error("CUDA support not built; rebuild with CUDA");
+    }
+
+    Tensor relu_cuda(const Tensor&) {
+        throw std::runtime_error("CUDA support not built; rebuild with CUDA");
+    }
+}

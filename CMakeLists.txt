@@ -51,6 +51,7 @@ set(VLM_CORE_SOURCES
     src/core/storage.cpp
     src/core/cpu_allocator.cpp
     src/ops/matmul.cpp
+    src/ops/elementwise.cpp
 )
 
 if(HAS_CUDA)
@@ -58,12 +59,14 @@ if(HAS_CUDA)
         src/core/cuda_allocator.cpp
         src/core/cuda_copy.cu
         src/ops/matmul.cu
+        src/ops/elementwise.cu
     )
 else()
     list(APPEND VLM_CORE_SOURCES
         src/core/cuda_allocator_stub.cpp
         src/core/cuda_copy_stub.cpp
         src/ops/matmul_cuda_stub.cpp
+        src/ops/elementwise_cuda_stub.cpp
     )
 endif()
 
@@ -84,4 +87,8 @@ if(BUILD_TESTS)
     add_executable(test_matmul tests/test_matmul.cpp)
     target_link_libraries(test_matmul PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_matmul)
+
+    add_executable(test_elementwise tests/test_elementwise.cpp)
+    target_link_libraries(test_elementwise PRIVATE vlm_core GTest::gtest_main)
+    gtest_discover_tests(test_elementwise)
 endif()
