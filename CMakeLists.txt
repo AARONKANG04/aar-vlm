@@ -52,6 +52,7 @@ set(VLM_CORE_SOURCES
     src/core/cpu_allocator.cpp
     src/ops/matmul.cpp
     src/ops/elementwise.cpp
+    src/ops/softmax.cpp
 )
 
 if(HAS_CUDA)
@@ -60,6 +61,7 @@ if(HAS_CUDA)
         src/core/cuda_copy.cu
         src/ops/matmul.cu
         src/ops/elementwise.cu
+        src/ops/softmax.cu
     )
 else()
     list(APPEND VLM_CORE_SOURCES
@@ -67,6 +69,7 @@ else()
         src/core/cuda_copy_stub.cpp
         src/ops/matmul_cuda_stub.cpp
         src/ops/elementwise_cuda_stub.cpp
+        src/ops/softmax_cuda_stub.cpp
     )
 endif()
 
@@ -91,4 +94,8 @@ if(BUILD_TESTS)
     add_executable(test_elementwise tests/test_elementwise.cpp)
     target_link_libraries(test_elementwise PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_elementwise)
+
+    add_executable(test_softmax tests/test_softmax.cpp)
+    target_link_libraries(test_softmax PRIVATE vlm_core GTest::gtest_main)
+    gtest_discover_tests(test_softmax)
 endif()
