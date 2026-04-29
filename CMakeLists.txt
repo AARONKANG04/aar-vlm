@@ -50,6 +50,8 @@ set(VLM_CORE_SOURCES
     src/core/tensor.cpp
     src/core/storage.cpp
     src/core/cpu_allocator.cpp
+    src/autograd/function.cpp
+    src/autograd/backward.cpp
     src/ops/matmul.cpp
     src/ops/elementwise.cpp
     src/ops/softmax.cpp
@@ -105,4 +107,8 @@ if(BUILD_TESTS)
     add_executable(test_layernorm tests/test_layernorm.cpp)
     target_link_libraries(test_layernorm PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_layernorm)
+
+    add_executable(test_autograd tests/test_autograd.cpp)
+    target_link_libraries(test_autograd PRIVATE vlm_core GTest::gtest_main)
+    gtest_discover_tests(test_autograd)
 endif()
