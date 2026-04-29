@@ -26,4 +26,13 @@ namespace vlm {
         }
         CUDA_CHECK(cudaMemcpy(dst, src, nbytes, kind));
     }
+
+    void zero_bytes(void* p, Device device, size_t nbytes) {
+        if (nbytes == 0) return;
+        if (device == Device::CPU) {
+            std::memset(p, 0, nbytes);
+        } else {
+            CUDA_CHECK(cudaMemset(p, 0, nbytes));
+        }
+    }
 }

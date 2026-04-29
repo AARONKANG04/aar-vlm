@@ -42,6 +42,48 @@ namespace {
     }
 }
 
+TEST(AutogradOps, CudaSumAllBackwardOnesGrad) {
+#ifndef HAS_CUDA
+    GTEST_SKIP();
+#endif
+    Tensor a_cpu = Tensor::empty({4}, DType::Fp32);
+    fill_fp32(a_cpu, {1, 2, 3, 4});
+    Tensor a = a_cpu.to(Device::CUDA);
+    a.set_requires_grad(true);
+
+    {
+        Tensor loss = sum_all(a);
+        loss.backward();
+    }
+
+    Tensor ag_host = a.grad()->to(Device::CPU);
+    auto* ag = static_cast<const float*>(ag_host.data());
+    for (int i = 0; i < 4; ++i) EXPECT_FLOAT_EQ(ag[i], 1.0f);
+}
+
+TEST(AutogradOps, CudaMulFanOutAccumulatesGrad) {
+#ifndef HAS_CUDA
+    GTEST_SKIP();
+#endif
+    Tensor a_cpu = Tensor::empty({4}, DType::Fp32);
+    fill_fp32(a_cpu, {1, 2, 3, 4});
+    Tensor a = a_cpu.to(Device::CUDA);
+    a.set_requires_grad(true);
+
+    {
+        Tensor c = mul(a, a);
+        Tensor loss = sum_all(c);
+        loss.backward();
+    }
+
+    Tensor ag_host = a.grad()->to(Device::CPU);
+    auto* ag = static_cast<const float*>(ag_host.data());
+    EXPECT_FLOAT_EQ(ag[0], 2.0f);
+    EXPECT_FLOAT_EQ(ag[1], 4.0f);
+    EXPECT_FLOAT_EQ(ag[2], 6.0f);
+    EXPECT_FLOAT_EQ(ag[3], 8.0f);
+}
+
 TEST(AutogradOps, AddBackwardOnesGrad) {
     Tensor a = Tensor::empty({4}, DType::Fp32);
     Tensor b = Tensor::empty({4}, DType::Fp32);

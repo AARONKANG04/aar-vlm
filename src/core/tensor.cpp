@@ -42,11 +42,7 @@ namespace vlm {
     Tensor Tensor::zeros(std::vector<int64_t> shape, DType dtype, Device device) {
         Tensor t = empty(std::move(shape), dtype, device);
         if (t.storage) {
-            if (device == Device::CPU) {
-                std::memset(t.storage->data(), 0, t.storage->nbytes());
-            } else {
-                throw std::runtime_error("zeros() on non-CPU device not yet implemented");
-            }
+            zero_bytes(t.storage->data(), device, t.storage->nbytes());
         }
         return t;
     }

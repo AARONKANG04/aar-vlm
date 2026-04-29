@@ -35,6 +35,16 @@ TEST(Tensor, ZerosAllocatesAndZeros) {
     for (int i = 0; i < 4; ++i) EXPECT_FLOAT_EQ(p[i], 0.0f);
 }
 
+TEST(Tensor, CudaZerosMatchesCpu) {
+#ifndef HAS_CUDA
+    GTEST_SKIP();
+#endif
+    Tensor t = Tensor::zeros({8}, DType::Fp32, Device::CUDA);
+    Tensor h = t.to(Device::CPU);
+    auto* p = static_cast<float*>(h.data());
+    for (int i = 0; i < 8; ++i) EXPECT_FLOAT_EQ(p[i], 0.0f);
+}
+
 TEST(Tensor, EmptyAllocatesButDoesNotZero) {
     Tensor t = Tensor::empty({4}, DType::Fp32);
     ASSERT_NE(t.data(), nullptr);

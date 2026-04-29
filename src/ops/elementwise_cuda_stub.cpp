@@ -22,4 +22,8 @@ namespace vlm {
     Tensor relu_backward_cuda(const Tensor&, const Tensor&) {
         throw std::runtime_error("CUDA support not built; rebuild with CUDA");
     }
+
+    void fill_cuda(Tensor&, float) {
+        throw std::runtime_error("CUDA support not built; rebuild with CUDA");
+    }
 }

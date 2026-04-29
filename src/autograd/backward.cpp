@@ -10,6 +10,8 @@
 #include "autograd/function.hpp"
 
 namespace vlm {
+    Tensor add_cuda(const Tensor& a, const Tensor& b);
+
     namespace {
         Tensor add_grads(const Tensor& a, const Tensor& b) {
             if (a.shape != b.shape) {
@@ -18,16 +20,15 @@ namespace vlm {
             if (a.device != b.device) {
                 throw std::runtime_error("autograd: grad device mismatch");
             }
-            Tensor out = Tensor::empty(a.shape, a.dtype, a.device);
-            if (a.device == Device::CPU) {
-                const float* ap = static_cast<const float*>(a.data());
-                const float* bp = static_cast<const float*>(b.data());
-                float* op = static_cast<float*>(out.data());
-                const size_t n = a.numel();
-                for (size_t i = 0; i < n; ++i) op[i] = ap[i] + bp[i];
-            } else {
-                throw std::runtime_error("autograd: CUDA grad accumulation not yet supported");
+            if (a.device == Device::CUDA) {
+                return add_cuda(a, b);
             }
+            Tensor out = Tensor::empty(a.shape, a.dtype, a.device);
+            const float* ap = static_cast<const float*>(a.data());
+            const float* bp = static_cast<const float*>(b.data());
+            float* op = static_cast<float*>(out.data());
+            const size_t n = a.numel();
+            for (size_t i = 0; i < n; ++i) op[i] = ap[i] + bp[i];
             return out;
         }
 

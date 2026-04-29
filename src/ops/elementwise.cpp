@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "autograd/function.hpp"
+#include "core/cuda_copy.hpp"
 
 namespace vlm {
     Tensor add_cuda(const Tensor& a, const Tensor& b);
@@ -12,6 +13,7 @@ namespace vlm {
     Tensor relu_cuda(const Tensor& a);
     Tensor sum_all_cuda(const Tensor& a);
     Tensor relu_backward_cuda(const Tensor& grad_out, const Tensor& x);
+    void fill_cuda(Tensor& out, float v);
 
     namespace {
         void check_binary(const Tensor& a, const Tensor& b, const char* op) {
@@ -124,13 +126,14 @@ namespace vlm {
             Device input_device = Device::CPU;
             std::vector<Tensor> backward(const Tensor& grad_output) override {
                 Tensor g = Tensor::empty(input_shape, input_dtype, input_device);
-                const float v = *static_cast<const float*>(grad_output.data());
+                float v;
+                copy_bytes(&v, Device::CPU, grad_output.data(), grad_output.device, sizeof(float));
                 if (input_device == Device::CPU) {
                     float* p = static_cast<float*>(g.data());
                     const size_t n = g.numel();
                     for (size_t i = 0; i < n; ++i) p[i] = v;
                 } else {
-                    throw std::runtime_error("autograd: sum_all backward on CUDA not yet supported");
+                    fill_cuda(g, v);
                 }
                 return {g};
             }

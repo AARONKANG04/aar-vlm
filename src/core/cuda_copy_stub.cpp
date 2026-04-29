@@ -14,4 +14,13 @@ namespace vlm {
         }
         throw std::runtime_error("CUDA support not built; rebuild with CUDA");
     }
+
+    void zero_bytes(void* p, Device device, size_t nbytes) {
+        if (nbytes == 0) return;
+        if (device == Device::CPU) {
+            std::memset(p, 0, nbytes);
+            return;
+        }
+        throw std::runtime_error("CUDA support not built; rebuild with CUDA");
+    }
 }
