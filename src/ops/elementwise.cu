@@ -23,6 +23,29 @@ namespace vlm {
             if (i < n) c[i] = a[i] > 0.0f ? a[i] : 0.0f;
         }
 
+        __global__ void relu_backward_kernel(const float* go, const float* x, float* g, size_t n) {
+            size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+            if (i < n) g[i] = x[i] > 0.0f ? go[i] : 0.0f;
+        }
+
+        __global__ void sum_all_kernel(const float* X, float* out, size_t n) {
+            extern __shared__ float shared[];
+            const int tid = threadIdx.x;
+            const int bsz = blockDim.x;
+
+            float local = 0.0f;
+            for (size_t i = tid; i < n; i += bsz) local += X[i];
+            shared[tid] = local;
+            __syncthreads();
+
+            for (int s = bsz / 2; s > 0; s >>= 1) {
+                if (tid < s) shared[tid] += shared[tid + s];
+                __syncthreads();
+            }
+
+            if (tid == 0) *out = shared[0];
+        }
+
         unsigned int grid_for(size_t n) {
             return static_cast<unsigned int>((n + BLOCK - 1) / BLOCK);
         }
@@ -58,6 +81,31 @@ namespace vlm {
         Tensor out = Tensor::empty(a.shape, a.dtype, Device::CUDA);
         const size_t n = a.numel();
         relu_kernel<<<grid_for(n), BLOCK>>>(
+            static_cast<const float*>(a.data()),
+            static_cast<float*>(out.data()),
+            n);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return out;
+    }
+
+    Tensor relu_backward_cuda(const Tensor& grad_out, const Tensor& x) {
+        Tensor g = Tensor::empty(grad_out.shape, grad_out.dtype, Device::CUDA);
+        const size_t n = grad_out.numel();
+        relu_backward_kernel<<<grid_for(n), BLOCK>>>(
+            static_cast<const float*>(grad_out.data()),
+            static_cast<const float*>(x.data()),
+            static_cast<float*>(g.data()),
+            n);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return g;
+    }
+
+    Tensor sum_all_cuda(const Tensor& a) {
+        Tensor out = Tensor::empty({}, a.dtype, Device::CUDA);
+        const size_t n = a.numel();
+        sum_all_kernel<<<1, BLOCK, BLOCK * sizeof(float)>>>(
             static_cast<const float*>(a.data()),
             static_cast<float*>(out.data()),
             n);

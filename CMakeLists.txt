@@ -111,4 +111,8 @@ if(BUILD_TESTS)
     add_executable(test_autograd tests/test_autograd.cpp)
     target_link_libraries(test_autograd PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_autograd)
+
+    add_executable(test_autograd_ops tests/test_autograd_ops.cpp)
+    target_link_libraries(test_autograd_ops PRIVATE vlm_core GTest::gtest_main)
+    gtest_discover_tests(test_autograd_ops)
 endif()

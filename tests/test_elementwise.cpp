@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 #include "core/tensor.hpp"
@@ -119,5 +121,44 @@ TEST(Elementwise, CudaReluMatchesCpu) {
     auto* cp = static_cast<const float*>(c_cpu.data());
     auto* gp = static_cast<const float*>(c_gpu.data());
     for (int i = 0; i < N; ++i) EXPECT_FLOAT_EQ(cp[i], gp[i]);
+#endif
+}
+
+TEST(Elementwise, SumAllBasic) {
+    Tensor a = Tensor::empty({4}, DType::Fp32);
+    fill_fp32(a, {1, 2, 3, 4});
+    Tensor s = sum_all(a);
+    EXPECT_EQ(s.numel(), 1u);
+    EXPECT_EQ(s.shape.size(), 0u);
+    EXPECT_FLOAT_EQ(*static_cast<const float*>(s.data()), 10.0f);
+}
+
+TEST(Elementwise, SumAllMultiDim) {
+    Tensor a = Tensor::empty({2, 3}, DType::Fp32);
+    fill_fp32(a, {1, 2, 3, 4, 5, 6});
+    Tensor s = sum_all(a);
+    EXPECT_FLOAT_EQ(*static_cast<const float*>(s.data()), 21.0f);
+}
+
+TEST(Elementwise, SumAllScalar) {
+    Tensor a = Tensor::empty({}, DType::Fp32);
+    *static_cast<float*>(a.data()) = 7.5f;
+    Tensor s = sum_all(a);
+    EXPECT_FLOAT_EQ(*static_cast<const float*>(s.data()), 7.5f);
+}
+
+TEST(Elementwise, CudaSumAllMatchesCpu) {
+#ifndef HAS_CUDA
+    GTEST_SKIP();
+#else
+    constexpr int N = 4096;
+    Tensor a = Tensor::empty({N}, DType::Fp32);
+    auto* ap = static_cast<float*>(a.data());
+    for (int i = 0; i < N; ++i) ap[i] = std::sin(i * 0.07f) * 0.5f;
+    Tensor s_cpu = sum_all(a);
+    Tensor s_gpu = sum_all(a.to(Device::CUDA)).to(Device::CPU);
+    const float c = *static_cast<const float*>(s_cpu.data());
+    const float g = *static_cast<const float*>(s_gpu.data());
+    EXPECT_NEAR(c, g, 1e-4f * std::max(std::abs(c), 1.0f));
 #endif
 }

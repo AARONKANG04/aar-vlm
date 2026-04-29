@@ -49,6 +49,32 @@ namespace vlm {
                 row_out[j] *= inv_sum;
             }
         }
+
+        __global__ void softmax_backward_kernel(const float* G, const float* Y, float* DX, int last) {
+            extern __shared__ float shared[];
+            const int row = blockIdx.x;
+            const int tid = threadIdx.x;
+            const int bsz = blockDim.x;
+
+            const float* g_row  = G  + static_cast<size_t>(row) * last;
+            const float* y_row  = Y  + static_cast<size_t>(row) * last;
+            float*       dx_row = DX + static_cast<size_t>(row) * last;
+
+            float ldot = 0.0f;
+            for (int j = tid; j < last; j += bsz) ldot += g_row[j] * y_row[j];
+            shared[tid] = ldot;
+            __syncthreads();
+            for (int s = bsz / 2; s > 0; s >>= 1) {
+                if (tid < s) shared[tid] += shared[tid + s];
+                __syncthreads();
+            }
+            const float dot = shared[0];
+            __syncthreads();
+
+            for (int j = tid; j < last; j += bsz) {
+                dx_row[j] = y_row[j] * (g_row[j] - dot);
+            }
+        }
     }
 
     Tensor softmax_cuda(const Tensor& x) {
@@ -65,5 +91,22 @@ namespace vlm {
         CUDA_CHECK(cudaGetLastError());
         CUDA_CHECK(cudaDeviceSynchronize());
         return out;
+    }
+
+    Tensor softmax_backward_cuda(const Tensor& g, const Tensor& y) {
+        Tensor dx = Tensor::empty(g.shape, g.dtype, Device::CUDA);
+        const int last = static_cast<int>(g.shape.back());
+        const int64_t outer = g.numel() / last;
+
+        dim3 grid(static_cast<unsigned int>(outer));
+        dim3 block(BLOCK);
+        softmax_backward_kernel<<<grid, block, BLOCK * sizeof(float)>>>(
+            static_cast<const float*>(g.data()),
+            static_cast<const float*>(y.data()),
+            static_cast<float*>(dx.data()),
+            last);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return dx;
     }
 }

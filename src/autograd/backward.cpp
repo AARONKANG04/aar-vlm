@@ -1,7 +1,6 @@
 #include "autograd/backward.hpp"
 
 #include <algorithm>
-#include <functional>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -46,18 +45,34 @@ namespace vlm {
     void run_backward(const Tensor& root, const Tensor& grad_output) {
         if (!root.grad_fn) return;
 
+        struct Frame {
+            std::shared_ptr<Function> fn;
+            bool expanded;
+        };
+        std::vector<Frame> stack;
         std::vector<std::shared_ptr<Function>> order;
         std::unordered_set<Function*> visited;
-        std::function<void(const std::shared_ptr<Function>&)> dfs =
-            [&](const std::shared_ptr<Function>& fn) {
-                if (visited.count(fn.get())) return;
-                visited.insert(fn.get());
-                for (const auto& edge : fn->inputs) {
-                    if (edge.grad_fn) dfs(edge.grad_fn);
+
+        stack.push_back({root.grad_fn, false});
+        while (!stack.empty()) {
+            Frame& top = stack.back();
+            if (!top.expanded) {
+                if (visited.count(top.fn.get())) {
+                    stack.pop_back();
+                    continue;
                 }
-                order.push_back(fn);
-            };
-        dfs(root.grad_fn);
+                visited.insert(top.fn.get());
+                top.expanded = true;
+                for (const auto& edge : top.fn->inputs) {
+                    if (edge.grad_fn && !visited.count(edge.grad_fn.get())) {
+                        stack.push_back({edge.grad_fn, false});
+                    }
+                }
+            } else {
+                order.push_back(std::move(top.fn));
+                stack.pop_back();
+            }
+        }
         std::reverse(order.begin(), order.end());
 
         std::unordered_map<Function*, Tensor> grads;

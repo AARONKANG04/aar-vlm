@@ -55,6 +55,38 @@ TEST(Matmul, RejectsInnerDimMismatch) {
     EXPECT_THROW(matmul(a, b), std::invalid_argument);
 }
 
+TEST(Matmul, ABTransposedBasic) {
+    Tensor a = Tensor::empty({2, 3}, DType::Fp32);
+    fill_fp32(a, {1, 2, 3, 4, 5, 6});
+    Tensor b = Tensor::empty({2, 3}, DType::Fp32);
+    fill_fp32(b, {7, 9, 11, 8, 10, 12});
+
+    Tensor c = matmul_a_bt(a, b);
+
+    ASSERT_EQ(c.shape, (std::vector<int64_t>{2, 2}));
+    auto* p = static_cast<const float*>(c.data());
+    EXPECT_FLOAT_EQ(p[0], 58.0f);
+    EXPECT_FLOAT_EQ(p[1], 64.0f);
+    EXPECT_FLOAT_EQ(p[2], 139.0f);
+    EXPECT_FLOAT_EQ(p[3], 154.0f);
+}
+
+TEST(Matmul, ATransposedBBasic) {
+    Tensor a = Tensor::empty({3, 2}, DType::Fp32);
+    fill_fp32(a, {1, 4, 2, 5, 3, 6});
+    Tensor b = Tensor::empty({3, 2}, DType::Fp32);
+    fill_fp32(b, {7, 8, 9, 10, 11, 12});
+
+    Tensor c = matmul_at_b(a, b);
+
+    ASSERT_EQ(c.shape, (std::vector<int64_t>{2, 2}));
+    auto* p = static_cast<const float*>(c.data());
+    EXPECT_FLOAT_EQ(p[0], 58.0f);
+    EXPECT_FLOAT_EQ(p[1], 64.0f);
+    EXPECT_FLOAT_EQ(p[2], 139.0f);
+    EXPECT_FLOAT_EQ(p[3], 154.0f);
+}
+
 TEST(Matmul, RejectsDtypeMismatch) {
     Tensor a = Tensor::empty({2, 2}, DType::Fp32);
     Tensor b = Tensor::empty({2, 2}, DType::Fp16);
