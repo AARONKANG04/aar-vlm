@@ -53,6 +53,7 @@ set(VLM_CORE_SOURCES
     src/ops/matmul.cpp
     src/ops/elementwise.cpp
     src/ops/softmax.cpp
+    src/ops/layernorm.cpp
 )
 
 if(HAS_CUDA)
@@ -62,6 +63,7 @@ if(HAS_CUDA)
         src/ops/matmul.cu
         src/ops/elementwise.cu
         src/ops/softmax.cu
+        src/ops/layernorm.cu
     )
 else()
     list(APPEND VLM_CORE_SOURCES
@@ -70,6 +72,7 @@ else()
         src/ops/matmul_cuda_stub.cpp
         src/ops/elementwise_cuda_stub.cpp
         src/ops/softmax_cuda_stub.cpp
+        src/ops/layernorm_cuda_stub.cpp
     )
 endif()
 
@@ -98,4 +101,8 @@ if(BUILD_TESTS)
     add_executable(test_softmax tests/test_softmax.cpp)
     target_link_libraries(test_softmax PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_softmax)
+
+    add_executable(test_layernorm tests/test_layernorm.cpp)
+    target_link_libraries(test_layernorm PRIVATE vlm_core GTest::gtest_main)
+    gtest_discover_tests(test_layernorm)
 endif()
