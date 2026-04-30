@@ -1,9 +1,9 @@
 import argparse
 import json
-import time
 from pathlib import Path
 
 import numpy as np
+from tqdm import tqdm
 
 import aargrad as ag
 from aargrad import nn
@@ -126,8 +126,8 @@ def main():
     print(f"train tokens: {len(train_tokens):,} | val tokens: {len(val_tokens):,}")
 
     train_iter = cycle(train_loader)
-    t0 = time.time()
-    for it in range(1, args.max_iters + 1):
+    pbar = tqdm(range(1, args.max_iters + 1), desc="train", dynamic_ncols=True)
+    for it in pbar:
         batch = next(train_iter)
         x, y = to_device_batch(batch, device)
 
@@ -139,22 +139,21 @@ def main():
         optimizer.step()
 
         if it % args.log_interval == 0:
-            dt = time.time() - t0
             l = ag.to_numpy(loss.to(ag.Device.CPU)).item()
-            print(f"iter {it:5d} | loss {l:.4f} | {dt/it*1000:.1f} ms/it")
+            pbar.set_postfix(loss=f"{l:.4f}")
 
         if it % args.eval_interval == 0:
             val_loss = estimate_loss(model, val_loader, ce, device, args.eval_batches)
-            print(f"  eval | val loss {val_loss:.4f}")
+            pbar.write(f"iter {it} | val loss {val_loss:.4f}")
 
         if it % args.save_interval == 0:
             prefix = args.out_dir / f"ckpt_{it}"
             save_checkpoint(model, args, tok.vocab_size, prefix)
-            print(f"  saved {prefix}.npz / {prefix}.json")
+            pbar.write(f"iter {it} | saved {prefix}.npz")
 
     final = args.out_dir / "ckpt_final"
     save_checkpoint(model, args, tok.vocab_size, final)
-    print(f"saved {final}.npz / {final}.json")
+    pbar.write(f"saved {final}.npz / {final}.json")
 
 
 if __name__ == "__main__":

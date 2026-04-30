@@ -6,7 +6,7 @@ build-backend = "scikit_build_core.build"
 name = "vlm"
 version = "0.0.1"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.24"]
+dependencies = ["numpy>=1.24", "tqdm>=4.66"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ninja>=1.11"]
