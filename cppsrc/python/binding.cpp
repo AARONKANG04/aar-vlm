@@ -108,9 +108,12 @@ PYBIND11_MODULE(_core, m) {
     m.def("to_numpy", &to_numpy, py::arg("tensor"));
 
     m.def("add", &add, gil_release());
+    m.def("sub", &sub, gil_release());
     m.def("mul", &mul, gil_release());
     m.def("relu", &relu, gil_release());
+    m.def("gelu", &gelu, gil_release());
     m.def("sum_all", &sum_all, gil_release());
+    m.def("add_bias", &add_bias, gil_release());
     m.def("matmul", &matmul, gil_release());
     m.def("matmul_a_bt", &matmul_a_bt, gil_release());
     m.def("matmul_at_b", &matmul_at_b, gil_release());

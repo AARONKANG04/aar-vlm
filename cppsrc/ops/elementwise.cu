@@ -38,6 +38,44 @@ namespace vlm {
             if (i < n) d[i] += a * s[i];
         }
 
+        __global__ void sub_kernel(const float* a, const float* b, float* c, size_t n) {
+            size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+            if (i < n) c[i] = a[i] - b[i];
+        }
+
+        __global__ void neg_kernel(const float* a, float* c, size_t n) {
+            size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+            if (i < n) c[i] = -a[i];
+        }
+
+        __global__ void gelu_kernel(const float* a, float* c, size_t n) {
+            size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+            if (i < n) {
+                const float x = a[i];
+                c[i] = 0.5f * x * (1.0f + erff(x * 0.70710678118654752440f));
+            }
+        }
+
+        __global__ void gelu_backward_kernel(const float* go, const float* x, float* g, size_t n) {
+            size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+            if (i < n) {
+                const float xi = x[i];
+                const float cdf = 0.5f * (1.0f + erff(xi * 0.70710678118654752440f));
+                const float pdf = 0.39894228040143267794f * expf(-0.5f * xi * xi);
+                g[i] = go[i] * (cdf + xi * pdf);
+            }
+        }
+
+        __global__ void add_bias_kernel(const float* x, const float* b, float* y, size_t n, size_t D) {
+            size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+            if (i < n) y[i] = x[i] + b[i % D];
+        }
+
+        __global__ void bias_grad_kernel(const float* g, float* db, size_t n, size_t D) {
+            size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+            if (i < n) atomicAdd(&db[i % D], g[i]);
+        }
+
         __global__ void sum_all_kernel(const float* X, float* out, size_t n) {
             extern __shared__ float shared[];
             const int tid = threadIdx.x;
@@ -142,5 +180,81 @@ namespace vlm {
         CUDA_CHECK(cudaGetLastError());
         CUDA_CHECK(cudaDeviceSynchronize());
         return out;
+    }
+
+    Tensor sub_cuda(const Tensor& a, const Tensor& b) {
+        Tensor out = Tensor::empty(a.shape, a.dtype, Device::CUDA);
+        const size_t n = a.numel();
+        sub_kernel<<<grid_for(n), BLOCK>>>(
+            static_cast<const float*>(a.data()),
+            static_cast<const float*>(b.data()),
+            static_cast<float*>(out.data()),
+            n);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return out;
+    }
+
+    Tensor neg_cuda(const Tensor& a) {
+        Tensor out = Tensor::empty(a.shape, a.dtype, Device::CUDA);
+        const size_t n = a.numel();
+        neg_kernel<<<grid_for(n), BLOCK>>>(
+            static_cast<const float*>(a.data()),
+            static_cast<float*>(out.data()),
+            n);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return out;
+    }
+
+    Tensor gelu_cuda(const Tensor& a) {
+        Tensor out = Tensor::empty(a.shape, a.dtype, Device::CUDA);
+        const size_t n = a.numel();
+        gelu_kernel<<<grid_for(n), BLOCK>>>(
+            static_cast<const float*>(a.data()),
+            static_cast<float*>(out.data()),
+            n);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return out;
+    }
+
+    Tensor gelu_backward_cuda(const Tensor& grad_out, const Tensor& x) {
+        Tensor g = Tensor::empty(x.shape, x.dtype, Device::CUDA);
+        const size_t n = x.numel();
+        gelu_backward_kernel<<<grid_for(n), BLOCK>>>(
+            static_cast<const float*>(grad_out.data()),
+            static_cast<const float*>(x.data()),
+            static_cast<float*>(g.data()),
+            n);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return g;
+    }
+
+    Tensor add_bias_cuda(const Tensor& x, const Tensor& bias) {
+        Tensor out = Tensor::empty(x.shape, x.dtype, Device::CUDA);
+        const size_t n = x.numel();
+        const size_t D = bias.numel();
+        add_bias_kernel<<<grid_for(n), BLOCK>>>(
+            static_cast<const float*>(x.data()),
+            static_cast<const float*>(bias.data()),
+            static_cast<float*>(out.data()),
+            n, D);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return out;
+    }
+
+    Tensor bias_grad_cuda(const Tensor& grad_out, int64_t D) {
+        Tensor db = Tensor::zeros({D}, grad_out.dtype, Device::CUDA);
+        const size_t n = grad_out.numel();
+        bias_grad_kernel<<<grid_for(n), BLOCK>>>(
+            static_cast<const float*>(grad_out.data()),
+            static_cast<float*>(db.data()),
+            n, static_cast<size_t>(D));
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return db;
     }
 }

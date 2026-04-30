@@ -27,9 +27,9 @@ def test_mlp_loss_decreases(device):
     Y = np.maximum(X @ A_true, 0) @ B_true
 
     model = nn.Sequential(
-        nn.Linear(4, 8, rng=np.random.default_rng(1)),
-        nn.ReLU(),
-        nn.Linear(8, 1, rng=np.random.default_rng(2)),
+        nn.Linear(4, 8, bias=True, rng=np.random.default_rng(1)),
+        nn.GELU(),
+        nn.Linear(8, 1, bias=True, rng=np.random.default_rng(2)),
     )
     model.to(dev)
     optim = SGD(list(model.parameters()), lr=0.01)
@@ -37,9 +37,9 @@ def test_mlp_loss_decreases(device):
     losses = []
     for _ in range(200):
         x = ag.from_numpy(X).to(dev)
-        y_neg = ag.from_numpy(-Y).to(dev)
+        y = ag.from_numpy(Y).to(dev)
         pred = model(x)
-        diff = ag.add(pred, y_neg)
+        diff = ag.sub(pred, y)
         loss = ag.sum_all(ag.mul(diff, diff))
         optim.zero_grad()
         loss.backward()

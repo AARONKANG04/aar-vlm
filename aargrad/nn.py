@@ -50,20 +50,43 @@ class Module:
 
 
 class Linear(Module):
-    def __init__(self, in_features, out_features, *, rng=None):
+    def __init__(self, in_features, out_features, *, bias=False, rng=None):
         super().__init__()
         rng = rng if rng is not None else np.random.default_rng()
         bound = math.sqrt(6.0 / in_features)
         w = rng.uniform(-bound, bound, size=(out_features, in_features)).astype(np.float32)
         self.weight = Parameter(_core.from_numpy(w))
+        if bias:
+            self.bias = Parameter(_core.from_numpy(np.zeros((out_features,), dtype=np.float32)))
+        else:
+            self.bias = None
 
     def forward(self, x):
-        return _core.matmul_a_bt(x, self.weight.tensor)
+        y = _core.matmul_a_bt(x, self.weight.tensor)
+        if self.bias is not None:
+            y = _core.add_bias(y, self.bias.tensor)
+        return y
 
 
 class ReLU(Module):
     def forward(self, x):
         return _core.relu(x)
+
+
+class GELU(Module):
+    def forward(self, x):
+        return _core.gelu(x)
+
+
+class LayerNorm(Module):
+    def __init__(self, normalized_features, eps=1e-5):
+        super().__init__()
+        self.weight = Parameter(_core.from_numpy(np.ones((normalized_features,), dtype=np.float32)))
+        self.bias = Parameter(_core.from_numpy(np.zeros((normalized_features,), dtype=np.float32)))
+        self.eps = eps
+
+    def forward(self, x):
+        return _core.layernorm(x, self.weight.tensor, self.bias.tensor, self.eps)
 
 
 class Sequential(Module):
