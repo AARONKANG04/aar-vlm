@@ -26,6 +26,7 @@ else()
 endif()
 
 option(BUILD_TESTS "Build tests" ON)
+option(BUILD_PYTHON "Build Python bindings" OFF)
 
 include(FetchContent)
 
@@ -47,39 +48,39 @@ if(BUILD_TESTS)
 endif()
 
 set(VLM_CORE_SOURCES
-    src/core/tensor.cpp
-    src/core/storage.cpp
-    src/core/cpu_allocator.cpp
-    src/autograd/function.cpp
-    src/autograd/backward.cpp
-    src/ops/matmul.cpp
-    src/ops/elementwise.cpp
-    src/ops/softmax.cpp
-    src/ops/layernorm.cpp
+    cppsrc/core/tensor.cpp
+    cppsrc/core/storage.cpp
+    cppsrc/core/cpu_allocator.cpp
+    cppsrc/autograd/function.cpp
+    cppsrc/autograd/backward.cpp
+    cppsrc/ops/matmul.cpp
+    cppsrc/ops/elementwise.cpp
+    cppsrc/ops/softmax.cpp
+    cppsrc/ops/layernorm.cpp
 )
 
 if(HAS_CUDA)
     list(APPEND VLM_CORE_SOURCES
-        src/core/cuda_allocator.cpp
-        src/core/cuda_copy.cu
-        src/ops/matmul.cu
-        src/ops/elementwise.cu
-        src/ops/softmax.cu
-        src/ops/layernorm.cu
+        cppsrc/core/cuda_allocator.cpp
+        cppsrc/core/cuda_copy.cu
+        cppsrc/ops/matmul.cu
+        cppsrc/ops/elementwise.cu
+        cppsrc/ops/softmax.cu
+        cppsrc/ops/layernorm.cu
     )
 else()
     list(APPEND VLM_CORE_SOURCES
-        src/core/cuda_allocator_stub.cpp
-        src/core/cuda_copy_stub.cpp
-        src/ops/matmul_cuda_stub.cpp
-        src/ops/elementwise_cuda_stub.cpp
-        src/ops/softmax_cuda_stub.cpp
-        src/ops/layernorm_cuda_stub.cpp
+        cppsrc/core/cuda_allocator_stub.cpp
+        cppsrc/core/cuda_copy_stub.cpp
+        cppsrc/ops/matmul_cuda_stub.cpp
+        cppsrc/ops/elementwise_cuda_stub.cpp
+        cppsrc/ops/softmax_cuda_stub.cpp
+        cppsrc/ops/layernorm_cuda_stub.cpp
     )
 endif()
 
 add_library(vlm_core STATIC ${VLM_CORE_SOURCES})
-target_include_directories(vlm_core PUBLIC src)
+target_include_directories(vlm_core PUBLIC cppsrc)
 target_compile_features(vlm_core PUBLIC cxx_std_20)
 
 if(HAS_CUDA)
@@ -88,31 +89,44 @@ if(HAS_CUDA)
 endif()
 
 if(BUILD_TESTS)
-    add_executable(test_tensor tests/test_tensor.cpp)
+    add_executable(test_tensor tests/cpp/test_tensor.cpp)
     target_link_libraries(test_tensor PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_tensor)
 
-    add_executable(test_matmul tests/test_matmul.cpp)
+    add_executable(test_matmul tests/cpp/test_matmul.cpp)
     target_link_libraries(test_matmul PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_matmul)
 
-    add_executable(test_elementwise tests/test_elementwise.cpp)
+    add_executable(test_elementwise tests/cpp/test_elementwise.cpp)
     target_link_libraries(test_elementwise PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_elementwise)
 
-    add_executable(test_softmax tests/test_softmax.cpp)
+    add_executable(test_softmax tests/cpp/test_softmax.cpp)
     target_link_libraries(test_softmax PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_softmax)
 
-    add_executable(test_layernorm tests/test_layernorm.cpp)
+    add_executable(test_layernorm tests/cpp/test_layernorm.cpp)
     target_link_libraries(test_layernorm PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_layernorm)
 
-    add_executable(test_autograd tests/test_autograd.cpp)
+    add_executable(test_autograd tests/cpp/test_autograd.cpp)
     target_link_libraries(test_autograd PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_autograd)
 
-    add_executable(test_autograd_ops tests/test_autograd_ops.cpp)
+    add_executable(test_autograd_ops tests/cpp/test_autograd_ops.cpp)
     target_link_libraries(test_autograd_ops PRIVATE vlm_core GTest::gtest_main)
     gtest_discover_tests(test_autograd_ops)
+endif()
+
+if(BUILD_PYTHON)
+    set(PYBIND11_FINDPYTHON ON)
+    FetchContent_Declare(pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG v2.13.6
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(pybind11)
+
+    pybind11_add_module(_core MODULE cppsrc/python/binding.cpp)
+    target_link_libraries(_core PRIVATE vlm_core)
+    install(TARGETS _core LIBRARY DESTINATION vlm)
 endif()
