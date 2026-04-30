@@ -91,6 +91,7 @@ endif()
 add_library(vlm_core STATIC ${VLM_CORE_SOURCES})
 target_include_directories(vlm_core PUBLIC cppsrc)
 target_compile_features(vlm_core PUBLIC cxx_std_20)
+set_target_properties(vlm_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(HAS_CUDA)
     target_link_libraries(vlm_core PUBLIC CUDA::cudart)
