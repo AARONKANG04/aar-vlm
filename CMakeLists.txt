@@ -95,7 +95,6 @@ set_target_properties(vlm_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(HAS_CUDA)
     target_link_libraries(vlm_core PUBLIC CUDA::cudart)
-    set_target_properties(vlm_core PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 endif()
 
 if(BUILD_TESTS)
@@ -138,8 +137,5 @@ if(BUILD_PYTHON)
 
     pybind11_add_module(_core MODULE cppsrc/python/binding.cpp)
     target_link_libraries(_core PRIVATE vlm_core)
-    if(HAS_CUDA)
-        set_target_properties(_core PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-    endif()
     install(TARGETS _core LIBRARY DESTINATION aargrad)
 endif()
