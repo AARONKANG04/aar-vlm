@@ -64,6 +64,7 @@ set(VLM_CORE_SOURCES
     cppsrc/ops/cross_entropy.cpp
     cppsrc/ops/dropout.cpp
     cppsrc/ops/adamw.cpp
+    cppsrc/ops/flash_attention.cpp
 )
 
 if(HAS_CUDA)
@@ -81,6 +82,7 @@ if(HAS_CUDA)
         cppsrc/ops/cross_entropy.cu
         cppsrc/ops/dropout.cu
         cppsrc/ops/adamw.cu
+        cppsrc/ops/flash_attention.cu
     )
 else()
     list(APPEND VLM_CORE_SOURCES
@@ -97,6 +99,7 @@ else()
         cppsrc/ops/cross_entropy_cuda_stub.cpp
         cppsrc/ops/dropout_cuda_stub.cpp
         cppsrc/ops/adamw_cuda_stub.cpp
+        cppsrc/ops/flash_attention_cuda_stub.cpp
     )
 endif()
 

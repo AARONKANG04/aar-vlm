@@ -5,5 +5,10 @@ __pycache__/
 *.egg-info/
 dist/
 .pytest_cache/
-vlm/_core*.so
+aargrad/_core*.so
 .venv/
+
+python/shakespeare/data/input.txt
+python/shakespeare/data/*.bin
+python/shakespeare/data/meta.json
+python/shakespeare/data/ckpt_*

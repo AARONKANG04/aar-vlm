@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "core/cuda_check.hpp"
+#include "core/cuda_copy.hpp"
 
 namespace vlm {
     namespace {

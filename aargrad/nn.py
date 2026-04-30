@@ -186,10 +186,7 @@ class MultiHeadAttention(Module):
         q = self._take(qkv, 0)
         k = self._take(qkv, 1)
         v = self._take(qkv, 2)
-        scores = _core.scale(_core.bmm_a_bt(q, k), 1.0 / math.sqrt(self.d_head))
-        if self.causal:
-            scores = _core.apply_causal_mask(scores)
-        attn = _core.softmax(scores)
-        out = _core.transpose(_core.bmm(attn, v), 1, 2)
+        out = _core.flash_attention(q, k, v, self.causal)
+        out = _core.transpose(out, 1, 2)
         out = _core.reshape(out, [B, T, self.d_model])
         return self.out_proj(out)

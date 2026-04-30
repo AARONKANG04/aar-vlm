@@ -20,6 +20,7 @@
 #include "ops/cross_entropy.hpp"
 #include "ops/dropout.hpp"
 #include "ops/adamw.hpp"
+#include "ops/flash_attention.hpp"
 
 namespace py = pybind11;
 using namespace vlm;
@@ -163,5 +164,8 @@ PYBIND11_MODULE(_core, m) {
           py::arg("lr"), py::arg("beta1"), py::arg("beta2"),
           py::arg("eps"), py::arg("weight_decay"),
           py::arg("bias_correction1"), py::arg("bias_correction2"),
+          gil_release());
+    m.def("flash_attention", &flash_attention,
+          py::arg("q"), py::arg("k"), py::arg("v"), py::arg("causal"),
           gil_release());
 }

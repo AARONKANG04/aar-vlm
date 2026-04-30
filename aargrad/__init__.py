@@ -33,6 +33,7 @@ from ._core import (
     manual_seed,
     scaled_add_inplace,
     adamw_step,
+    flash_attention,
 )
 
 from . import nn
@@ -73,6 +74,7 @@ __all__ = [
     "manual_seed",
     "scaled_add_inplace",
     "adamw_step",
+    "flash_attention",
     "nn",
     "optim",
 ]
