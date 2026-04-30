@@ -109,3 +109,36 @@ def scaled_dot_product_attention(q, k, v, *, causal=False):
         scores = _core.apply_causal_mask(scores)
     attn = _core.softmax(scores)
     return _core.matmul(attn, v)
+
+
+class MultiHeadAttention(Module):
+    def __init__(self, d_model, n_heads, *, causal=False, bias=True, rng=None):
+        super().__init__()
+        if d_model % n_heads != 0:
+            raise ValueError("d_model must be divisible by n_heads")
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.d_head = d_model // n_heads
+        self.causal = causal
+        rng = rng if rng is not None else np.random.default_rng()
+        self.q_proj = Linear(d_model, d_model, bias=bias, rng=rng)
+        self.k_proj = Linear(d_model, d_model, bias=bias, rng=rng)
+        self.v_proj = Linear(d_model, d_model, bias=bias, rng=rng)
+        self.out_proj = Linear(d_model, d_model, bias=bias, rng=rng)
+
+    def _split(self, t, B, T):
+        t = _core.reshape(t, [B, T, self.n_heads, self.d_head])
+        return _core.transpose(t, 1, 2)
+
+    def forward(self, x):
+        B, T, _ = x.shape
+        q = self._split(self.q_proj(x), B, T)
+        k = self._split(self.k_proj(x), B, T)
+        v = self._split(self.v_proj(x), B, T)
+        scores = _core.scale(_core.bmm_a_bt(q, k), 1.0 / math.sqrt(self.d_head))
+        if self.causal:
+            scores = _core.apply_causal_mask(scores)
+        attn = _core.softmax(scores)
+        out = _core.transpose(_core.bmm(attn, v), 1, 2)
+        out = _core.reshape(out, [B, T, self.d_model])
+        return self.out_proj(out)

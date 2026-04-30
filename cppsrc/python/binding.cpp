@@ -14,6 +14,8 @@
 #include "ops/softmax.hpp"
 #include "ops/layernorm.hpp"
 #include "ops/attention.hpp"
+#include "ops/shape.hpp"
+#include "ops/bmm.hpp"
 
 namespace py = pybind11;
 using namespace vlm;
@@ -127,4 +129,9 @@ PYBIND11_MODULE(_core, m) {
           gil_release());
     m.def("scale", &scale, py::arg("x"), py::arg("alpha"), gil_release());
     m.def("apply_causal_mask", &apply_causal_mask, gil_release());
+    m.def("reshape", &reshape, py::arg("x"), py::arg("shape"), gil_release());
+    m.def("transpose", &transpose, py::arg("x"), py::arg("dim_a"), py::arg("dim_b"), gil_release());
+    m.def("bmm", &bmm, gil_release());
+    m.def("bmm_a_bt", &bmm_a_bt, gil_release());
+    m.def("bmm_at_b", &bmm_at_b, gil_release());
 }

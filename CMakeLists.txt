@@ -58,6 +58,8 @@ set(VLM_CORE_SOURCES
     cppsrc/ops/softmax.cpp
     cppsrc/ops/layernorm.cpp
     cppsrc/ops/attention.cpp
+    cppsrc/ops/shape.cpp
+    cppsrc/ops/bmm.cpp
 )
 
 if(HAS_CUDA)
@@ -69,6 +71,8 @@ if(HAS_CUDA)
         cppsrc/ops/softmax.cu
         cppsrc/ops/layernorm.cu
         cppsrc/ops/attention.cu
+        cppsrc/ops/shape.cu
+        cppsrc/ops/bmm.cu
     )
 else()
     list(APPEND VLM_CORE_SOURCES
@@ -79,6 +83,8 @@ else()
         cppsrc/ops/softmax_cuda_stub.cpp
         cppsrc/ops/layernorm_cuda_stub.cpp
         cppsrc/ops/attention_cuda_stub.cpp
+        cppsrc/ops/shape_cuda_stub.cpp
+        cppsrc/ops/bmm_cuda_stub.cpp
     )
 endif()
 

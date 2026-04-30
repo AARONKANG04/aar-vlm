@@ -1,0 +1,135 @@
+#include "ops/bmm.hpp"
+
+#include <cuda_runtime.h>
+
+#include "core/cuda_check.hpp"
+
+namespace vlm {
+    namespace {
+        constexpr int TILE = 16;
+
+        __global__ void bmm_kernel(const float* A, const float* B, float* C,
+                                   int64_t M, int64_t K, int64_t N) {
+            const int64_t bi = blockIdx.z;
+            const int64_t i = blockIdx.y * TILE + threadIdx.y;
+            const int64_t j = blockIdx.x * TILE + threadIdx.x;
+            if (i >= M || j >= N) return;
+            const float* Ab = A + bi * M * K;
+            const float* Bb = B + bi * K * N;
+            float* Cb = C + bi * M * N;
+            float acc = 0.0f;
+            for (int64_t k = 0; k < K; ++k) {
+                acc += Ab[i * K + k] * Bb[k * N + j];
+            }
+            Cb[i * N + j] = acc;
+        }
+
+        __global__ void bmm_a_bt_kernel(const float* A, const float* B, float* C,
+                                        int64_t M, int64_t K, int64_t N) {
+            const int64_t bi = blockIdx.z;
+            const int64_t i = blockIdx.y * TILE + threadIdx.y;
+            const int64_t j = blockIdx.x * TILE + threadIdx.x;
+            if (i >= M || j >= N) return;
+            const float* Ab = A + bi * M * K;
+            const float* Bb = B + bi * N * K;
+            float* Cb = C + bi * M * N;
+            float acc = 0.0f;
+            for (int64_t k = 0; k < K; ++k) {
+                acc += Ab[i * K + k] * Bb[j * K + k];
+            }
+            Cb[i * N + j] = acc;
+        }
+
+        __global__ void bmm_at_b_kernel(const float* A, const float* B, float* C,
+                                        int64_t M, int64_t K, int64_t N) {
+            const int64_t bi = blockIdx.z;
+            const int64_t i = blockIdx.y * TILE + threadIdx.y;
+            const int64_t j = blockIdx.x * TILE + threadIdx.x;
+            if (i >= M || j >= N) return;
+            const float* Ab = A + bi * K * M;
+            const float* Bb = B + bi * K * N;
+            float* Cb = C + bi * M * N;
+            float acc = 0.0f;
+            for (int64_t k = 0; k < K; ++k) {
+                acc += Ab[k * M + i] * Bb[k * N + j];
+            }
+            Cb[i * N + j] = acc;
+        }
+
+        int64_t leading_product(const Tensor& a) {
+            int64_t p = 1;
+            for (size_t i = 0; i + 2 < a.shape.size(); ++i) p *= a.shape[i];
+            return p;
+        }
+
+        std::vector<int64_t> with_last_two(const Tensor& a, int64_t last_minus_1, int64_t last) {
+            std::vector<int64_t> out(a.shape.begin(), a.shape.end() - 2);
+            out.push_back(last_minus_1);
+            out.push_back(last);
+            return out;
+        }
+
+        dim3 grid_for(int64_t M, int64_t N, int64_t B) {
+            return dim3(static_cast<unsigned int>((N + TILE - 1) / TILE),
+                        static_cast<unsigned int>((M + TILE - 1) / TILE),
+                        static_cast<unsigned int>(B));
+        }
+    }
+
+    Tensor bmm_cuda(const Tensor& a, const Tensor& b) {
+        const size_t nd = a.shape.size();
+        const int64_t M = a.shape[nd - 2];
+        const int64_t K = a.shape[nd - 1];
+        const int64_t N = b.shape[nd - 1];
+        const int64_t B = leading_product(a);
+        Tensor out = Tensor::empty(with_last_two(a, M, N), a.dtype, Device::CUDA);
+        dim3 block(TILE, TILE);
+        dim3 grid = grid_for(M, N, B);
+        bmm_kernel<<<grid, block>>>(
+            static_cast<const float*>(a.data()),
+            static_cast<const float*>(b.data()),
+            static_cast<float*>(out.data()),
+            M, K, N);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return out;
+    }
+
+    Tensor bmm_a_bt_cuda(const Tensor& a, const Tensor& b) {
+        const size_t nd = a.shape.size();
+        const int64_t M = a.shape[nd - 2];
+        const int64_t K = a.shape[nd - 1];
+        const int64_t N = b.shape[nd - 2];
+        const int64_t B = leading_product(a);
+        Tensor out = Tensor::empty(with_last_two(a, M, N), a.dtype, Device::CUDA);
+        dim3 block(TILE, TILE);
+        dim3 grid = grid_for(M, N, B);
+        bmm_a_bt_kernel<<<grid, block>>>(
+            static_cast<const float*>(a.data()),
+            static_cast<const float*>(b.data()),
+            static_cast<float*>(out.data()),
+            M, K, N);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return out;
+    }
+
+    Tensor bmm_at_b_cuda(const Tensor& a, const Tensor& b) {
+        const size_t nd = a.shape.size();
+        const int64_t K = a.shape[nd - 2];
+        const int64_t M = a.shape[nd - 1];
+        const int64_t N = b.shape[nd - 1];
+        const int64_t B = leading_product(a);
+        Tensor out = Tensor::empty(with_last_two(a, M, N), a.dtype, Device::CUDA);
+        dim3 block(TILE, TILE);
+        dim3 grid = grid_for(M, N, B);
+        bmm_at_b_kernel<<<grid, block>>>(
+            static_cast<const float*>(a.data()),
+            static_cast<const float*>(b.data()),
+            static_cast<float*>(out.data()),
+            M, K, N);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return out;
+    }
+}

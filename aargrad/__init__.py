@@ -18,6 +18,11 @@ from ._core import (
     softmax,
     layernorm,
     apply_causal_mask,
+    reshape,
+    transpose,
+    bmm,
+    bmm_a_bt,
+    bmm_at_b,
     scaled_add_inplace,
 )
 
@@ -44,6 +49,11 @@ __all__ = [
     "softmax",
     "layernorm",
     "apply_causal_mask",
+    "reshape",
+    "transpose",
+    "bmm",
+    "bmm_a_bt",
+    "bmm_at_b",
     "scaled_add_inplace",
     "nn",
     "optim",

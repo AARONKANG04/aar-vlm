@@ -11,6 +11,15 @@ namespace vlm {
     Tensor matmul_at_b_cuda(const Tensor& a, const Tensor& b);
 
     namespace {
+        Tensor as_view(const Tensor& src, std::vector<int64_t> new_shape) {
+            Tensor v;
+            v.shape = std::move(new_shape);
+            v.dtype = src.dtype;
+            v.device = src.device;
+            v.storage = src.storage;
+            return v;
+        }
+
         Tensor matmul_cpu(const Tensor& a, const Tensor& b) {
             const int64_t M = a.shape[0];
             const int64_t K = a.shape[1];
@@ -81,15 +90,45 @@ namespace vlm {
         }
 
         Tensor matmul_no_grad(const Tensor& a, const Tensor& b) {
-            return a.device == Device::CPU ? matmul_cpu(a, b) : matmul_cuda(a, b);
+            if (a.shape.size() == 2) {
+                return a.device == Device::CPU ? matmul_cpu(a, b) : matmul_cuda(a, b);
+            }
+            const int64_t K = a.shape.back();
+            const int64_t N = b.shape[1];
+            const int64_t M_flat = static_cast<int64_t>(a.numel()) / K;
+            Tensor a2d = as_view(a, {M_flat, K});
+            Tensor out2d = a.device == Device::CPU ? matmul_cpu(a2d, b) : matmul_cuda(a2d, b);
+            std::vector<int64_t> out_shape(a.shape.begin(), a.shape.end() - 1);
+            out_shape.push_back(N);
+            return as_view(out2d, std::move(out_shape));
         }
 
         Tensor matmul_a_bt_no_grad(const Tensor& a, const Tensor& b) {
-            return a.device == Device::CPU ? matmul_a_bt_cpu(a, b) : matmul_a_bt_cuda(a, b);
+            if (a.shape.size() == 2) {
+                return a.device == Device::CPU ? matmul_a_bt_cpu(a, b) : matmul_a_bt_cuda(a, b);
+            }
+            const int64_t K = a.shape.back();
+            const int64_t N = b.shape[0];
+            const int64_t M_flat = static_cast<int64_t>(a.numel()) / K;
+            Tensor a2d = as_view(a, {M_flat, K});
+            Tensor out2d = a.device == Device::CPU ? matmul_a_bt_cpu(a2d, b)
+                                                   : matmul_a_bt_cuda(a2d, b);
+            std::vector<int64_t> out_shape(a.shape.begin(), a.shape.end() - 1);
+            out_shape.push_back(N);
+            return as_view(out2d, std::move(out_shape));
         }
 
         Tensor matmul_at_b_no_grad(const Tensor& a, const Tensor& b) {
-            return a.device == Device::CPU ? matmul_at_b_cpu(a, b) : matmul_at_b_cuda(a, b);
+            if (a.shape.size() == 2 && b.shape.size() == 2) {
+                return a.device == Device::CPU ? matmul_at_b_cpu(a, b) : matmul_at_b_cuda(a, b);
+            }
+            const int64_t M = a.shape.back();
+            const int64_t N = b.shape.back();
+            const int64_t K_flat = static_cast<int64_t>(a.numel()) / M;
+            Tensor a2d = as_view(a, {K_flat, M});
+            Tensor b2d = as_view(b, {K_flat, N});
+            return a.device == Device::CPU ? matmul_at_b_cpu(a2d, b2d)
+                                           : matmul_at_b_cuda(a2d, b2d);
         }
 
         class MatmulFunction : public Function {
@@ -127,8 +166,8 @@ namespace vlm {
     }
 
     Tensor matmul(const Tensor& a, const Tensor& b) {
-        if (a.shape.size() != 2 || b.shape.size() != 2) {
-            throw std::invalid_argument("matmul: inputs must be 2D");
+        if (a.shape.size() < 2 || b.shape.size() != 2) {
+            throw std::invalid_argument("matmul: LHS rank must be >= 2 and RHS must be 2D");
         }
         if (a.dtype != b.dtype) {
             throw std::invalid_argument("matmul: dtype mismatch");
@@ -139,7 +178,7 @@ namespace vlm {
         if (a.dtype != DType::Fp32) {
             throw std::invalid_argument("matmul: only Fp32 supported");
         }
-        if (b.shape[0] != a.shape[1]) {
+        if (b.shape[0] != a.shape.back()) {
             throw std::invalid_argument("matmul: inner dimensions mismatch");
         }
         if (!a.requires_grad && !b.requires_grad) {
@@ -157,8 +196,8 @@ namespace vlm {
     }
 
     Tensor matmul_a_bt(const Tensor& a, const Tensor& b) {
-        if (a.shape.size() != 2 || b.shape.size() != 2) {
-            throw std::invalid_argument("matmul_a_bt: inputs must be 2D");
+        if (a.shape.size() < 2 || b.shape.size() != 2) {
+            throw std::invalid_argument("matmul_a_bt: LHS rank must be >= 2 and RHS must be 2D");
         }
         if (a.dtype != b.dtype || a.device != b.device) {
             throw std::invalid_argument("matmul_a_bt: dtype/device mismatch");
@@ -166,7 +205,7 @@ namespace vlm {
         if (a.dtype != DType::Fp32) {
             throw std::invalid_argument("matmul_a_bt: only Fp32 supported");
         }
-        if (a.shape[1] != b.shape[1]) {
+        if (a.shape.back() != b.shape[1]) {
             throw std::invalid_argument("matmul_a_bt: contraction dim mismatch");
         }
         if (!a.requires_grad && !b.requires_grad) {
