@@ -14,6 +14,7 @@ namespace vlm {
     Tensor sum_all_cuda(const Tensor& a);
     Tensor relu_backward_cuda(const Tensor& grad_out, const Tensor& x);
     void fill_cuda(Tensor& out, float v);
+    void scaled_add_inplace_cuda(Tensor& dst, const Tensor& src, float alpha);
 
     namespace {
         void check_binary(const Tensor& a, const Tensor& b, const char* op) {
@@ -203,5 +204,25 @@ namespace vlm {
         out.requires_grad = true;
         out.grad_fn = fn;
         return out;
+    }
+
+    void scaled_add_inplace(Tensor& dst, const Tensor& src, float alpha) {
+        if (dst.shape != src.shape) {
+            throw std::invalid_argument("scaled_add_inplace: shape mismatch");
+        }
+        if (dst.dtype != src.dtype || dst.dtype != DType::Fp32) {
+            throw std::invalid_argument("scaled_add_inplace: only Fp32 supported");
+        }
+        if (dst.device != src.device) {
+            throw std::invalid_argument("scaled_add_inplace: device mismatch");
+        }
+        if (dst.device == Device::CUDA) {
+            scaled_add_inplace_cuda(dst, src, alpha);
+            return;
+        }
+        float* d = static_cast<float*>(dst.data());
+        const float* s = static_cast<const float*>(src.data());
+        const size_t n = dst.numel();
+        for (size_t i = 0; i < n; ++i) d[i] += alpha * s[i];
     }
 }

@@ -1,0 +1,78 @@
+import math
+
+import numpy as np
+
+from . import _core
+
+
+class Parameter:
+    def __init__(self, tensor):
+        tensor.requires_grad = True
+        self.tensor = tensor
+
+
+class Module:
+    def __init__(self):
+        object.__setattr__(self, "_parameters", {})
+        object.__setattr__(self, "_modules", {})
+
+    def __setattr__(self, name, value):
+        if isinstance(value, Parameter):
+            self._parameters[name] = value
+        elif isinstance(value, Module):
+            self._modules[name] = value
+        super().__setattr__(name, value)
+
+    def parameters(self):
+        for p in self._parameters.values():
+            yield p
+        for m in self._modules.values():
+            yield from m.parameters()
+
+    def zero_grad(self):
+        for p in self.parameters():
+            p.tensor.zero_grad()
+
+    def to(self, device):
+        for p in self._parameters.values():
+            new_t = p.tensor.to(device)
+            new_t.requires_grad = True
+            p.tensor = new_t
+        for m in self._modules.values():
+            m.to(device)
+        return self
+
+    def forward(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def __call__(self, *args, **kwargs):
+        return self.forward(*args, **kwargs)
+
+
+class Linear(Module):
+    def __init__(self, in_features, out_features, *, rng=None):
+        super().__init__()
+        rng = rng if rng is not None else np.random.default_rng()
+        bound = math.sqrt(6.0 / in_features)
+        w = rng.uniform(-bound, bound, size=(out_features, in_features)).astype(np.float32)
+        self.weight = Parameter(_core.from_numpy(w))
+
+    def forward(self, x):
+        return _core.matmul_a_bt(x, self.weight.tensor)
+
+
+class ReLU(Module):
+    def forward(self, x):
+        return _core.relu(x)
+
+
+class Sequential(Module):
+    def __init__(self, *layers):
+        super().__init__()
+        for i, layer in enumerate(layers):
+            setattr(self, f"layer_{i}", layer)
+
+    def forward(self, x):
+        for m in self._modules.values():
+            x = m(x)
+        return x

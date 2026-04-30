@@ -26,4 +26,8 @@ namespace vlm {
     void fill_cuda(Tensor&, float) {
         throw std::runtime_error("CUDA support not built; rebuild with CUDA");
     }
+
+    void scaled_add_inplace_cuda(Tensor&, const Tensor&, float) {
+        throw std::runtime_error("CUDA support not built; rebuild with CUDA");
+    }
 }

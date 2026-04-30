@@ -12,7 +12,7 @@ dependencies = ["numpy>=1.24"]
 dev = ["pytest>=8", "ninja>=1.11"]
 
 [tool.scikit-build]
-wheel.packages = ["vlm"]
+wheel.packages = ["aargrad", "vlm"]
 cmake.version = ">=3.24"
 build-dir = "build/{wheel_tag}"
 editable.rebuild = true

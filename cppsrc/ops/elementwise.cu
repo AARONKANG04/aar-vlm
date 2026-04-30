@@ -33,6 +33,11 @@ namespace vlm {
             if (i < n) p[i] = v;
         }
 
+        __global__ void scaled_add_kernel(float* d, const float* s, float a, size_t n) {
+            size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+            if (i < n) d[i] += a * s[i];
+        }
+
         __global__ void sum_all_kernel(const float* X, float* out, size_t n) {
             extern __shared__ float shared[];
             const int tid = threadIdx.x;
@@ -111,6 +116,18 @@ namespace vlm {
         const size_t n = out.numel();
         if (n == 0) return;
         fill_kernel<<<grid_for(n), BLOCK>>>(static_cast<float*>(out.data()), v, n);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+    }
+
+    void scaled_add_inplace_cuda(Tensor& dst, const Tensor& src, float alpha) {
+        const size_t n = dst.numel();
+        if (n == 0) return;
+        scaled_add_kernel<<<grid_for(n), BLOCK>>>(
+            static_cast<float*>(dst.data()),
+            static_cast<const float*>(src.data()),
+            alpha,
+            n);
         CUDA_CHECK(cudaGetLastError());
         CUDA_CHECK(cudaDeviceSynchronize());
     }

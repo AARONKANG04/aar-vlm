@@ -128,5 +128,5 @@ if(BUILD_PYTHON)
 
     pybind11_add_module(_core MODULE cppsrc/python/binding.cpp)
     target_link_libraries(_core PRIVATE vlm_core)
-    install(TARGETS _core LIBRARY DESTINATION vlm)
+    install(TARGETS _core LIBRARY DESTINATION aargrad)
 endif()

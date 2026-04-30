@@ -118,4 +118,7 @@ PYBIND11_MODULE(_core, m) {
     m.def("layernorm", &layernorm,
           py::arg("x"), py::arg("weight"), py::arg("bias"), py::arg("eps") = 1e-5f,
           gil_release());
+    m.def("scaled_add_inplace", &scaled_add_inplace,
+          py::arg("dst"), py::arg("src"), py::arg("alpha"),
+          gil_release());
 }

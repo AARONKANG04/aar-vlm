@@ -102,6 +102,28 @@ namespace vlm {
             }
             const char* name() const override { return "MatmulFunction"; }
         };
+
+        class MatmulABTFunction : public Function {
+        public:
+            Tensor saved_a, saved_b;
+            std::vector<Tensor> backward(const Tensor& grad_output) override {
+                Tensor dA = matmul_no_grad(grad_output, saved_b);
+                Tensor dB = matmul_at_b_no_grad(grad_output, saved_a);
+                return {dA, dB};
+            }
+            const char* name() const override { return "MatmulABTFunction"; }
+        };
+
+        class MatmulATBFunction : public Function {
+        public:
+            Tensor saved_a, saved_b;
+            std::vector<Tensor> backward(const Tensor& grad_output) override {
+                Tensor dA = matmul_a_bt_no_grad(saved_b, grad_output);
+                Tensor dB = matmul_no_grad(saved_a, grad_output);
+                return {dA, dB};
+            }
+            const char* name() const override { return "MatmulATBFunction"; }
+        };
     }
 
     Tensor matmul(const Tensor& a, const Tensor& b) {
@@ -147,7 +169,18 @@ namespace vlm {
         if (a.shape[1] != b.shape[1]) {
             throw std::invalid_argument("matmul_a_bt: contraction dim mismatch");
         }
-        return matmul_a_bt_no_grad(a, b);
+        if (!a.requires_grad && !b.requires_grad) {
+            return matmul_a_bt_no_grad(a, b);
+        }
+        auto fn = std::make_shared<MatmulABTFunction>();
+        fn->record_input(a);
+        fn->record_input(b);
+        fn->saved_a = a;
+        fn->saved_b = b;
+        Tensor out = matmul_a_bt_no_grad(a, b);
+        out.requires_grad = true;
+        out.grad_fn = fn;
+        return out;
     }
 
     Tensor matmul_at_b(const Tensor& a, const Tensor& b) {
@@ -163,6 +196,17 @@ namespace vlm {
         if (a.shape[0] != b.shape[0]) {
             throw std::invalid_argument("matmul_at_b: contraction dim mismatch");
         }
-        return matmul_at_b_no_grad(a, b);
+        if (!a.requires_grad && !b.requires_grad) {
+            return matmul_at_b_no_grad(a, b);
+        }
+        auto fn = std::make_shared<MatmulATBFunction>();
+        fn->record_input(a);
+        fn->record_input(b);
+        fn->saved_a = a;
+        fn->saved_b = b;
+        Tensor out = matmul_at_b_no_grad(a, b);
+        out.requires_grad = true;
+        out.grad_fn = fn;
+        return out;
     }
 }
