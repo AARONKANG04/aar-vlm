@@ -138,5 +138,8 @@ if(BUILD_PYTHON)
 
     pybind11_add_module(_core MODULE cppsrc/python/binding.cpp)
     target_link_libraries(_core PRIVATE vlm_core)
+    if(HAS_CUDA)
+        set_target_properties(_core PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    endif()
     install(TARGETS _core LIBRARY DESTINATION aargrad)
 endif()
