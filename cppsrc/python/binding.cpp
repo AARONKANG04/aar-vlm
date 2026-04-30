@@ -16,6 +16,8 @@
 #include "ops/attention.hpp"
 #include "ops/shape.hpp"
 #include "ops/bmm.hpp"
+#include "ops/embedding.hpp"
+#include "ops/cross_entropy.hpp"
 
 namespace py = pybind11;
 using namespace vlm;
@@ -25,14 +27,16 @@ namespace {
 
 DType numpy_to_dtype(const py::dtype& dt) {
     if (dt.is(py::dtype::of<float>())) return DType::Fp32;
+    if (dt.is(py::dtype::of<int64_t>())) return DType::Int64;
     if (dt.kind() == 'f' && dt.itemsize() == 2) return DType::Fp16;
-    throw std::runtime_error("unsupported numpy dtype; expected float32 or float16");
+    throw std::runtime_error("unsupported numpy dtype; expected float32, float16, or int64");
 }
 
 py::dtype dtype_to_numpy(DType d) {
     switch (d) {
         case DType::Fp32: return py::dtype::of<float>();
         case DType::Fp16: return py::dtype("float16");
+        case DType::Int64: return py::dtype::of<int64_t>();
         case DType::Bf16: throw std::runtime_error("bf16 has no numpy equivalent");
     }
     throw std::runtime_error("unknown dtype");
@@ -65,7 +69,8 @@ PYBIND11_MODULE(_core, m) {
     py::enum_<DType>(m, "DType")
         .value("Fp32", DType::Fp32)
         .value("Fp16", DType::Fp16)
-        .value("Bf16", DType::Bf16);
+        .value("Bf16", DType::Bf16)
+        .value("Int64", DType::Int64);
 
     py::enum_<Device>(m, "Device")
         .value("CPU", Device::CPU)
@@ -99,7 +104,7 @@ PYBIND11_MODULE(_core, m) {
         .def("backward", py::overload_cast<const Tensor&>(&Tensor::backward),
              py::arg("grad_output"), gil_release())
         .def("__repr__", [](const Tensor& t) {
-            static const char* dtype_names[] = {"Fp32", "Fp16", "Bf16"};
+            static const char* dtype_names[] = {"Fp32", "Fp16", "Bf16", "Int64"};
             std::ostringstream s;
             s << "Tensor(shape=[";
             for (size_t i = 0; i < t.shape.size(); ++i) {
@@ -143,4 +148,9 @@ PYBIND11_MODULE(_core, m) {
     m.def("bmm", &bmm, gil_release());
     m.def("bmm_a_bt", &bmm_a_bt, gil_release());
     m.def("bmm_at_b", &bmm_at_b, gil_release());
+    m.def("embedding", &embedding,
+          py::arg("weight"), py::arg("ids"), gil_release());
+    m.def("cross_entropy", &cross_entropy,
+          py::arg("logits"), py::arg("targets"),
+          py::arg("ignore_index") = -100, gil_release());
 }

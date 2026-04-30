@@ -27,6 +27,8 @@ from ._core import (
     bmm,
     bmm_a_bt,
     bmm_at_b,
+    embedding,
+    cross_entropy,
     scaled_add_inplace,
 )
 
@@ -62,6 +64,8 @@ __all__ = [
     "bmm",
     "bmm_a_bt",
     "bmm_at_b",
+    "embedding",
+    "cross_entropy",
     "scaled_add_inplace",
     "nn",
     "optim",

@@ -49,6 +49,33 @@ class Module:
         return self.forward(*args, **kwargs)
 
 
+class Embedding(Module):
+    def __init__(self, num_embeddings, embedding_dim, *, rng=None):
+        super().__init__()
+        rng = rng if rng is not None else np.random.default_rng()
+        w = rng.standard_normal((num_embeddings, embedding_dim)).astype(np.float32)
+        self.weight = Parameter(_core.from_numpy(w))
+
+    def forward(self, ids):
+        return _core.embedding(self.weight.tensor, ids)
+
+
+class CrossEntropyLoss(Module):
+    def __init__(self, ignore_index=-100):
+        super().__init__()
+        self.ignore_index = ignore_index
+
+    def forward(self, logits, targets):
+        if len(logits.shape) > 2:
+            *lead, V = logits.shape
+            N = 1
+            for d in lead:
+                N *= d
+            logits = _core.reshape(logits, [N, V])
+            targets = _core.reshape(targets, [N])
+        return _core.cross_entropy(logits, targets, self.ignore_index)
+
+
 class Linear(Module):
     def __init__(self, in_features, out_features, *, bias=False, rng=None):
         super().__init__()

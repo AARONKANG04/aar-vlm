@@ -60,6 +60,8 @@ set(VLM_CORE_SOURCES
     cppsrc/ops/attention.cpp
     cppsrc/ops/shape.cpp
     cppsrc/ops/bmm.cpp
+    cppsrc/ops/embedding.cpp
+    cppsrc/ops/cross_entropy.cpp
 )
 
 if(HAS_CUDA)
@@ -73,6 +75,8 @@ if(HAS_CUDA)
         cppsrc/ops/attention.cu
         cppsrc/ops/shape.cu
         cppsrc/ops/bmm.cu
+        cppsrc/ops/embedding.cu
+        cppsrc/ops/cross_entropy.cu
     )
 else()
     list(APPEND VLM_CORE_SOURCES
@@ -85,6 +89,8 @@ else()
         cppsrc/ops/attention_cuda_stub.cpp
         cppsrc/ops/shape_cuda_stub.cpp
         cppsrc/ops/bmm_cuda_stub.cpp
+        cppsrc/ops/embedding_cuda_stub.cpp
+        cppsrc/ops/cross_entropy_cuda_stub.cpp
     )
 endif()
 

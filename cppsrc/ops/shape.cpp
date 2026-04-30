@@ -47,10 +47,11 @@ namespace vlm {
             const size_t ndim = src.shape.size();
             const size_t total = src.numel();
             if (total == 0) return;
-            const float* X = static_cast<const float*>(src.data());
-            float* Y = static_cast<float*>(dst.data());
+            const size_t es = dtype_size(src.dtype);
+            const char* X = static_cast<const char*>(src.data());
+            char* Y = static_cast<char*>(dst.data());
             if (ndim == 0) {
-                Y[0] = X[0];
+                std::memcpy(Y, X, es);
                 return;
             }
             const auto& src_strides = src.strides;
@@ -64,7 +65,7 @@ namespace vlm {
                     rem -= static_cast<size_t>(idx[d] * dst_strides[d]);
                     src_off += idx[d] * src_strides[d];
                 }
-                Y[flat] = X[src_off];
+                std::memcpy(Y + flat * es, X + static_cast<size_t>(src_off) * es, es);
             }
         }
 
@@ -72,10 +73,11 @@ namespace vlm {
             const size_t ndim = src.shape.size();
             const size_t total = src.numel();
             if (total == 0) return;
-            const float* X = static_cast<const float*>(src.data());
-            float* Y = static_cast<float*>(dst.data());
+            const size_t es = dtype_size(src.dtype);
+            const char* X = static_cast<const char*>(src.data());
+            char* Y = static_cast<char*>(dst.data());
             if (ndim == 0) {
-                Y[0] = X[0];
+                std::memcpy(Y, X, es);
                 return;
             }
             const auto src_contig = compute_contiguous_strides(src.shape);
@@ -89,7 +91,7 @@ namespace vlm {
                     rem -= static_cast<size_t>(idx[d] * src_contig[d]);
                     dst_off += idx[d] * dst_strides[d];
                 }
-                Y[dst_off] = X[flat];
+                std::memcpy(Y + static_cast<size_t>(dst_off) * es, X + flat * es, es);
             }
         }
     }
@@ -115,13 +117,14 @@ namespace vlm {
         if (src.dtype != dst.dtype || src.device != dst.device) {
             throw std::runtime_error("copy_strided_to_contiguous: dtype/device mismatch");
         }
-        if (src.dtype != DType::Fp32) {
-            throw std::runtime_error("copy_strided_to_contiguous: only Fp32 supported");
-        }
         if (!dst.is_contiguous()) {
             throw std::runtime_error("copy_strided_to_contiguous: dst must be contiguous");
         }
         if (src.device == Device::CUDA) {
+            if (src.dtype != DType::Fp32) {
+                throw std::runtime_error(
+                    "copy_strided_to_contiguous: only Fp32 supported on CUDA");
+            }
             contiguous_cuda(src, dst);
             return;
         }
@@ -141,6 +144,10 @@ namespace vlm {
                 throw std::runtime_error("copy_contiguous_into_strided: src must be contiguous");
             }
             if (src_contig.device == Device::CUDA) {
+                if (src_contig.dtype != DType::Fp32) {
+                    throw std::runtime_error(
+                        "copy_contiguous_into_strided: only Fp32 supported on CUDA");
+                }
                 copy_contiguous_into_strided_cuda(src_contig, dst_strided);
                 return;
             }
@@ -235,9 +242,6 @@ namespace vlm {
     }
 
     Tensor contiguous(const Tensor& x) {
-        if (x.dtype != DType::Fp32) {
-            throw std::invalid_argument("contiguous: only Fp32 supported");
-        }
         if (x.is_contiguous()) {
             return x;
         }
@@ -254,9 +258,6 @@ namespace vlm {
     }
 
     Tensor reshape(const Tensor& x, std::vector<int64_t> new_shape) {
-        if (x.dtype != DType::Fp32) {
-            throw std::invalid_argument("reshape: only Fp32 supported");
-        }
         auto resolved = resolve_new_shape(new_shape, x.numel());
         Tensor src = x.is_contiguous() ? x : contiguous(x);
         Tensor out = make_view(src, resolved, compute_contiguous_strides(resolved),
@@ -273,9 +274,6 @@ namespace vlm {
     }
 
     Tensor transpose(const Tensor& x, int64_t dim_a, int64_t dim_b) {
-        if (x.dtype != DType::Fp32) {
-            throw std::invalid_argument("transpose: only Fp32 supported");
-        }
         const int64_t ndim = static_cast<int64_t>(x.shape.size());
         if (dim_a < 0 || dim_a >= ndim || dim_b < 0 || dim_b >= ndim) {
             throw std::invalid_argument("transpose: dim out of range");
@@ -298,9 +296,6 @@ namespace vlm {
     }
 
     Tensor slice(const Tensor& x, int64_t dim, int64_t start, int64_t end) {
-        if (x.dtype != DType::Fp32) {
-            throw std::invalid_argument("slice: only Fp32 supported");
-        }
         const int64_t ndim = static_cast<int64_t>(x.shape.size());
         if (dim < 0 || dim >= ndim) {
             throw std::invalid_argument("slice: dim out of range");
@@ -329,9 +324,6 @@ namespace vlm {
     }
 
     Tensor squeeze(const Tensor& x, int64_t dim) {
-        if (x.dtype != DType::Fp32) {
-            throw std::invalid_argument("squeeze: only Fp32 supported");
-        }
         const int64_t ndim = static_cast<int64_t>(x.shape.size());
         if (dim < 0 || dim >= ndim) {
             throw std::invalid_argument("squeeze: dim out of range");
@@ -358,9 +350,6 @@ namespace vlm {
     }
 
     Tensor unsqueeze(const Tensor& x, int64_t dim) {
-        if (x.dtype != DType::Fp32) {
-            throw std::invalid_argument("unsqueeze: only Fp32 supported");
-        }
         const int64_t ndim = static_cast<int64_t>(x.shape.size());
         if (dim < 0 || dim > ndim) {
             throw std::invalid_argument("unsqueeze: dim out of range");

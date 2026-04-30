@@ -9,6 +9,7 @@ namespace vlm {
         Fp32,
         Fp16,
         Bf16,
+        Int64,
     };
     enum class Device : uint8_t {
         CPU,
@@ -20,6 +21,7 @@ namespace vlm {
             case DType::Fp32: return 4;
             case DType::Fp16: return 2;
             case DType::Bf16: return 2;
+            case DType::Int64: return 8;
             default: throw std::runtime_error("Unsupported dtype");
         }
     }
