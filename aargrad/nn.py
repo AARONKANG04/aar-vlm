@@ -99,3 +99,13 @@ class Sequential(Module):
         for m in self._modules.values():
             x = m(x)
         return x
+
+
+def scaled_dot_product_attention(q, k, v, *, causal=False):
+    d_head = q.shape[-1]
+    scores = _core.matmul_a_bt(q, k)
+    scores = _core.scale(scores, 1.0 / math.sqrt(d_head))
+    if causal:
+        scores = _core.apply_causal_mask(scores)
+    attn = _core.softmax(scores)
+    return _core.matmul(attn, v)

@@ -11,6 +11,10 @@ namespace vlm {
         throw std::runtime_error("CUDA support not built; rebuild with CUDA");
     }
 
+    Tensor scale_cuda(const Tensor&, float) {
+        throw std::runtime_error("CUDA support not built; rebuild with CUDA");
+    }
+
     Tensor relu_cuda(const Tensor&) {
         throw std::runtime_error("CUDA support not built; rebuild with CUDA");
     }

@@ -13,6 +13,7 @@
 #include "ops/matmul.hpp"
 #include "ops/softmax.hpp"
 #include "ops/layernorm.hpp"
+#include "ops/attention.hpp"
 
 namespace py = pybind11;
 using namespace vlm;
@@ -124,4 +125,6 @@ PYBIND11_MODULE(_core, m) {
     m.def("scaled_add_inplace", &scaled_add_inplace,
           py::arg("dst"), py::arg("src"), py::arg("alpha"),
           gil_release());
+    m.def("scale", &scale, py::arg("x"), py::arg("alpha"), gil_release());
+    m.def("apply_causal_mask", &apply_causal_mask, gil_release());
 }

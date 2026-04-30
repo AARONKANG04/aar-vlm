@@ -22,6 +22,7 @@ namespace vlm {
     Tensor gelu_backward_cuda(const Tensor& grad_out, const Tensor& x);
     Tensor add_bias_cuda(const Tensor& x, const Tensor& bias);
     Tensor bias_grad_cuda(const Tensor& grad_out, int64_t D);
+    Tensor scale_cuda(const Tensor& x, float alpha);
 
     namespace {
         void check_binary(const Tensor& a, const Tensor& b, const char* op) {
@@ -59,6 +60,15 @@ namespace vlm {
             return out;
         }
 
+        Tensor scale_cpu(const Tensor& x, float alpha) {
+            Tensor out = Tensor::empty(x.shape, x.dtype, x.device);
+            const float* X = static_cast<const float*>(x.data());
+            float* Y = static_cast<float*>(out.data());
+            const size_t n = x.numel();
+            for (size_t i = 0; i < n; ++i) Y[i] = alpha * X[i];
+            return out;
+        }
+
         Tensor relu_cpu(const Tensor& a) {
             Tensor out = Tensor::empty(a.shape, a.dtype, a.device);
             const float* A = static_cast<const float*>(a.data());
@@ -84,6 +94,10 @@ namespace vlm {
 
         Tensor mul_no_grad(const Tensor& a, const Tensor& b) {
             return a.device == Device::CPU ? mul_cpu(a, b) : mul_cuda(a, b);
+        }
+
+        Tensor scale_no_grad(const Tensor& x, float alpha) {
+            return x.device == Device::CPU ? scale_cpu(x, alpha) : scale_cuda(x, alpha);
         }
 
         Tensor sub_cpu(const Tensor& a, const Tensor& b) {
@@ -224,6 +238,15 @@ namespace vlm {
             const char* name() const override { return "MulFunction"; }
         };
 
+        class ScaleFunction : public Function {
+        public:
+            float alpha = 1.0f;
+            std::vector<Tensor> backward(const Tensor& grad_output) override {
+                return {scale_no_grad(grad_output, alpha)};
+            }
+            const char* name() const override { return "ScaleFunction"; }
+        };
+
         class ReluFunction : public Function {
         public:
             Tensor saved_x;
@@ -307,6 +330,22 @@ namespace vlm {
         fn->saved_a = a;
         fn->saved_b = b;
         Tensor out = mul_no_grad(a, b);
+        out.requires_grad = true;
+        out.grad_fn = fn;
+        return out;
+    }
+
+    Tensor scale(const Tensor& x, float alpha) {
+        if (x.dtype != DType::Fp32) {
+            throw std::invalid_argument("scale: only Fp32 supported");
+        }
+        if (!x.requires_grad) {
+            return scale_no_grad(x, alpha);
+        }
+        auto fn = std::make_shared<ScaleFunction>();
+        fn->record_input(x);
+        fn->alpha = alpha;
+        Tensor out = scale_no_grad(x, alpha);
         out.requires_grad = true;
         out.grad_fn = fn;
         return out;

@@ -18,6 +18,11 @@ namespace vlm {
             if (i < n) c[i] = a[i] * b[i];
         }
 
+        __global__ void scale_kernel(const float* x, float* y, float a, size_t n) {
+            size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+            if (i < n) y[i] = a * x[i];
+        }
+
         __global__ void relu_kernel(const float* a, float* c, size_t n) {
             size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
             if (i < n) c[i] = a[i] > 0.0f ? a[i] : 0.0f;
@@ -120,6 +125,18 @@ namespace vlm {
             static_cast<const float*>(b.data()),
             static_cast<float*>(out.data()),
             n);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaDeviceSynchronize());
+        return out;
+    }
+
+    Tensor scale_cuda(const Tensor& x, float alpha) {
+        Tensor out = Tensor::empty(x.shape, x.dtype, Device::CUDA);
+        const size_t n = x.numel();
+        scale_kernel<<<grid_for(n), BLOCK>>>(
+            static_cast<const float*>(x.data()),
+            static_cast<float*>(out.data()),
+            alpha, n);
         CUDA_CHECK(cudaGetLastError());
         CUDA_CHECK(cudaDeviceSynchronize());
         return out;
