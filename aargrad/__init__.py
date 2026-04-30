@@ -32,6 +32,7 @@ from ._core import (
     dropout,
     manual_seed,
     scaled_add_inplace,
+    adamw_step,
 )
 
 from . import nn
@@ -71,6 +72,7 @@ __all__ = [
     "dropout",
     "manual_seed",
     "scaled_add_inplace",
+    "adamw_step",
     "nn",
     "optim",
 ]

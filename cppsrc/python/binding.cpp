@@ -19,6 +19,7 @@
 #include "ops/embedding.hpp"
 #include "ops/cross_entropy.hpp"
 #include "ops/dropout.hpp"
+#include "ops/adamw.hpp"
 
 namespace py = pybind11;
 using namespace vlm;
@@ -156,4 +157,11 @@ PYBIND11_MODULE(_core, m) {
           py::arg("ignore_index") = -100, gil_release());
     m.def("dropout", &dropout, py::arg("x"), py::arg("p"), gil_release());
     m.def("manual_seed", &manual_seed, py::arg("seed"));
+    m.def("adamw_step", &adamw_step,
+          py::arg("param"), py::arg("grad"),
+          py::arg("m"), py::arg("v"),
+          py::arg("lr"), py::arg("beta1"), py::arg("beta2"),
+          py::arg("eps"), py::arg("weight_decay"),
+          py::arg("bias_correction1"), py::arg("bias_correction2"),
+          gil_release());
 }
