@@ -52,9 +52,10 @@ py::array to_numpy(const Tensor& t) {
     if (t.device != Device::CPU) {
         throw std::runtime_error("to_numpy requires CPU tensor; call .to(Device.CPU) first");
     }
-    std::vector<py::ssize_t> shape(t.shape.begin(), t.shape.end());
-    py::array out(dtype_to_numpy(t.dtype), shape);
-    std::memcpy(out.mutable_data(), t.data(), t.nbytes());
+    Tensor src = t.is_contiguous() ? t : contiguous(t);
+    std::vector<py::ssize_t> shape(src.shape.begin(), src.shape.end());
+    py::array out(dtype_to_numpy(src.dtype), shape);
+    std::memcpy(out.mutable_data(), src.data(), src.nbytes());
     return out;
 }
 
@@ -81,6 +82,8 @@ PYBIND11_MODULE(_core, m) {
                     py::arg("shape"), py::arg("dtype"), py::arg("device") = Device::CPU,
                     gil_release())
         .def_readonly("shape", &Tensor::shape)
+        .def_readonly("strides", &Tensor::strides)
+        .def_readonly("storage_offset", &Tensor::storage_offset)
         .def_readonly("dtype", &Tensor::dtype)
         .def_readonly("device", &Tensor::device)
         .def_property("requires_grad",
@@ -88,6 +91,7 @@ PYBIND11_MODULE(_core, m) {
                       [](Tensor& t, bool r) { t.set_requires_grad(r); })
         .def_property_readonly("is_leaf", &Tensor::is_leaf)
         .def_property_readonly("numel", &Tensor::numel)
+        .def("is_contiguous", &Tensor::is_contiguous)
         .def_property_readonly("grad", &Tensor::grad)
         .def("to", &Tensor::to, py::arg("device"), gil_release())
         .def("zero_grad", &Tensor::zero_grad, gil_release())
@@ -131,6 +135,11 @@ PYBIND11_MODULE(_core, m) {
     m.def("apply_causal_mask", &apply_causal_mask, gil_release());
     m.def("reshape", &reshape, py::arg("x"), py::arg("shape"), gil_release());
     m.def("transpose", &transpose, py::arg("x"), py::arg("dim_a"), py::arg("dim_b"), gil_release());
+    m.def("slice", &slice,
+          py::arg("x"), py::arg("dim"), py::arg("start"), py::arg("end"), gil_release());
+    m.def("squeeze", &squeeze, py::arg("x"), py::arg("dim"), gil_release());
+    m.def("unsqueeze", &unsqueeze, py::arg("x"), py::arg("dim"), gil_release());
+    m.def("contiguous", &contiguous, py::arg("x"), gil_release());
     m.def("bmm", &bmm, gil_release());
     m.def("bmm_a_bt", &bmm_a_bt, gil_release());
     m.def("bmm_at_b", &bmm_at_b, gil_release());

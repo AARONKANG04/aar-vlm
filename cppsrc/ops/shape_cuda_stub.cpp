@@ -3,7 +3,10 @@
 #include <stdexcept>
 
 namespace vlm {
-    Tensor transpose_cuda(const Tensor&, int64_t, int64_t) {
+    void contiguous_cuda(const Tensor&, Tensor&) {
+        throw std::runtime_error("CUDA support not built; rebuild with CUDA");
+    }
+    void copy_contiguous_into_strided_cuda(const Tensor&, Tensor&) {
         throw std::runtime_error("CUDA support not built; rebuild with CUDA");
     }
 }

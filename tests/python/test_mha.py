@@ -37,14 +37,17 @@ def mha_ref(x, q_w, k_w, v_w, o_w, q_b, k_b, v_b, o_b, n_heads, causal=False):
 
 
 def _params_to_numpy(mha):
+    qkv_w = ag.to_numpy(mha.qkv_proj.weight.tensor)
+    qkv_b = ag.to_numpy(mha.qkv_proj.bias.tensor)
+    D = mha.d_model
     return {
-        "q_w": ag.to_numpy(mha.q_proj.weight.tensor),
-        "k_w": ag.to_numpy(mha.k_proj.weight.tensor),
-        "v_w": ag.to_numpy(mha.v_proj.weight.tensor),
+        "q_w": qkv_w[0:D],
+        "k_w": qkv_w[D:2 * D],
+        "v_w": qkv_w[2 * D:3 * D],
         "o_w": ag.to_numpy(mha.out_proj.weight.tensor),
-        "q_b": ag.to_numpy(mha.q_proj.bias.tensor),
-        "k_b": ag.to_numpy(mha.k_proj.bias.tensor),
-        "v_b": ag.to_numpy(mha.v_proj.bias.tensor),
+        "q_b": qkv_b[0:D],
+        "k_b": qkv_b[D:2 * D],
+        "v_b": qkv_b[2 * D:3 * D],
         "o_b": ag.to_numpy(mha.out_proj.bias.tensor),
     }
 

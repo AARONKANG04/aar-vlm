@@ -45,6 +45,26 @@ namespace vlm {
             return out;
         }
 
+        // Walk the leading-dim shape of `t` and produce per-flat-batch storage offsets
+        // (relative to t.data() which already includes t.storage_offset).
+        std::vector<int64_t> batch_offsets(const Tensor& t, int64_t B) {
+            std::vector<int64_t> offs(static_cast<size_t>(B), 0);
+            const size_t nd = t.shape.size();
+            if (nd <= 2 || B == 0) return offs;
+            const size_t bdims = nd - 2;
+            std::vector<int64_t> idx(bdims, 0);
+            for (int64_t bi = 0; bi < B; ++bi) {
+                int64_t off = 0;
+                for (size_t d = 0; d < bdims; ++d) off += idx[d] * t.strides[d];
+                offs[bi] = off;
+                for (int d = static_cast<int>(bdims) - 1; d >= 0; --d) {
+                    if (++idx[d] < t.shape[d]) break;
+                    idx[d] = 0;
+                }
+            }
+            return offs;
+        }
+
         Tensor bmm_cpu(const Tensor& a, const Tensor& b) {
             const size_t nd = a.shape.size();
             const int64_t M = a.shape[nd - 2];
@@ -52,18 +72,24 @@ namespace vlm {
             const int64_t N = b.shape[nd - 1];
             const int64_t B = leading_product(a);
             Tensor out = Tensor::empty(with_last_two(a, M, N), a.dtype, a.device);
+            const int64_t a_rs = a.strides[nd - 2];
+            const int64_t a_cs = a.strides[nd - 1];
+            const int64_t b_rs = b.strides[nd - 2];
+            const int64_t b_cs = b.strides[nd - 1];
+            const auto a_off = batch_offsets(a, B);
+            const auto b_off = batch_offsets(b, B);
             const float* A = static_cast<const float*>(a.data());
             const float* Bp = static_cast<const float*>(b.data());
             float* C = static_cast<float*>(out.data());
             for (int64_t bi = 0; bi < B; ++bi) {
-                const float* Ab = A + bi * M * K;
-                const float* Bb = Bp + bi * K * N;
+                const float* Ab = A + a_off[bi];
+                const float* Bb = Bp + b_off[bi];
                 float* Cb = C + bi * M * N;
                 for (int64_t i = 0; i < M; ++i) {
                     for (int64_t j = 0; j < N; ++j) {
                         float acc = 0.0f;
                         for (int64_t k = 0; k < K; ++k) {
-                            acc += Ab[i * K + k] * Bb[k * N + j];
+                            acc += Ab[i * a_rs + k * a_cs] * Bb[k * b_rs + j * b_cs];
                         }
                         Cb[i * N + j] = acc;
                     }
@@ -79,18 +105,24 @@ namespace vlm {
             const int64_t N = b.shape[nd - 2];
             const int64_t B = leading_product(a);
             Tensor out = Tensor::empty(with_last_two(a, M, N), a.dtype, a.device);
+            const int64_t a_rs = a.strides[nd - 2];
+            const int64_t a_cs = a.strides[nd - 1];
+            const int64_t b_rs = b.strides[nd - 2];
+            const int64_t b_cs = b.strides[nd - 1];
+            const auto a_off = batch_offsets(a, B);
+            const auto b_off = batch_offsets(b, B);
             const float* A = static_cast<const float*>(a.data());
             const float* Bp = static_cast<const float*>(b.data());
             float* C = static_cast<float*>(out.data());
             for (int64_t bi = 0; bi < B; ++bi) {
-                const float* Ab = A + bi * M * K;
-                const float* Bb = Bp + bi * N * K;
+                const float* Ab = A + a_off[bi];
+                const float* Bb = Bp + b_off[bi];
                 float* Cb = C + bi * M * N;
                 for (int64_t i = 0; i < M; ++i) {
                     for (int64_t j = 0; j < N; ++j) {
                         float acc = 0.0f;
                         for (int64_t k = 0; k < K; ++k) {
-                            acc += Ab[i * K + k] * Bb[j * K + k];
+                            acc += Ab[i * a_rs + k * a_cs] * Bb[j * b_rs + k * b_cs];
                         }
                         Cb[i * N + j] = acc;
                     }
@@ -106,18 +138,24 @@ namespace vlm {
             const int64_t N = b.shape[nd - 1];
             const int64_t B = leading_product(a);
             Tensor out = Tensor::empty(with_last_two(a, M, N), a.dtype, a.device);
+            const int64_t a_rs = a.strides[nd - 2];
+            const int64_t a_cs = a.strides[nd - 1];
+            const int64_t b_rs = b.strides[nd - 2];
+            const int64_t b_cs = b.strides[nd - 1];
+            const auto a_off = batch_offsets(a, B);
+            const auto b_off = batch_offsets(b, B);
             const float* A = static_cast<const float*>(a.data());
             const float* Bp = static_cast<const float*>(b.data());
             float* C = static_cast<float*>(out.data());
             for (int64_t bi = 0; bi < B; ++bi) {
-                const float* Ab = A + bi * K * M;
-                const float* Bb = Bp + bi * K * N;
+                const float* Ab = A + a_off[bi];
+                const float* Bb = Bp + b_off[bi];
                 float* Cb = C + bi * M * N;
                 for (int64_t i = 0; i < M; ++i) {
                     for (int64_t j = 0; j < N; ++j) {
                         float acc = 0.0f;
                         for (int64_t k = 0; k < K; ++k) {
-                            acc += Ab[k * M + i] * Bb[k * N + j];
+                            acc += Ab[k * a_rs + i * a_cs] * Bb[k * b_rs + j * b_cs];
                         }
                         Cb[i * N + j] = acc;
                     }

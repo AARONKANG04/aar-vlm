@@ -3,6 +3,8 @@
 #include <stdexcept>
 
 #include "autograd/function.hpp"
+#include "ops/attention.hpp"
+#include "ops/shape.hpp"
 
 namespace vlm {
     Tensor apply_causal_mask_cuda(const Tensor& x);
@@ -73,12 +75,13 @@ namespace vlm {
 
     Tensor apply_causal_mask(const Tensor& x) {
         check_causal(x);
-        if (!x.requires_grad) {
-            return apply_causal_mask_no_grad(x);
+        Tensor xc = x.is_contiguous() ? x : contiguous(x);
+        if (!xc.requires_grad) {
+            return apply_causal_mask_no_grad(xc);
         }
         auto fn = std::make_shared<CausalMaskFunction>();
-        fn->record_input(x);
-        Tensor out = apply_causal_mask_no_grad(x);
+        fn->record_input(xc);
+        Tensor out = apply_causal_mask_no_grad(xc);
         out.requires_grad = true;
         out.grad_fn = fn;
         return out;

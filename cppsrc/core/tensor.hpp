@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -12,6 +13,8 @@ namespace vlm {
 
     struct Tensor {
         std::vector<int64_t> shape;
+        std::vector<int64_t> strides;
+        int64_t storage_offset = 0;
         DType dtype = DType::Fp32;
         Device device = Device::CPU;
         std::shared_ptr<Storage> storage;
@@ -21,8 +24,7 @@ namespace vlm {
         std::shared_ptr<std::shared_ptr<Tensor>> grad_slot;
 
         Tensor() = default;
-        Tensor(std::vector<int64_t> shape, DType dtype, Device device = Device::CPU)
-            : shape(std::move(shape)), dtype(dtype), device(device) {}
+        Tensor(std::vector<int64_t> shape, DType dtype, Device device = Device::CPU);
 
         static Tensor empty(std::vector<int64_t> shape, DType dtype, Device device = Device::CPU);
         static Tensor zeros(std::vector<int64_t> shape, DType dtype, Device device = Device::CPU);
@@ -30,6 +32,7 @@ namespace vlm {
 
         size_t numel() const;
         size_t nbytes() const;
+        bool is_contiguous() const;
 
         void* data();
         const void* data() const;
@@ -43,4 +46,6 @@ namespace vlm {
         void backward();
         void backward(const Tensor& grad_output);
     };
+
+    std::vector<int64_t> compute_contiguous_strides(const std::vector<int64_t>& shape);
 }

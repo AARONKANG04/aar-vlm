@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 #include "autograd/function.hpp"
+#include "ops/shape.hpp"
 
 namespace vlm {
     Tensor layernorm_cuda(const Tensor& x, const Tensor& weight, const Tensor& bias, float eps);
@@ -197,22 +198,26 @@ namespace vlm {
             throw std::invalid_argument("layernorm: eps must be > 0");
         }
 
-        if (!x.requires_grad && !weight.requires_grad && !bias.requires_grad) {
-            return layernorm_no_grad(x, weight, bias, eps);
+        Tensor xc = x.is_contiguous() ? x : contiguous(x);
+        Tensor wc = weight.is_contiguous() ? weight : contiguous(weight);
+        Tensor bc = bias.is_contiguous() ? bias : contiguous(bias);
+
+        if (!xc.requires_grad && !wc.requires_grad && !bc.requires_grad) {
+            return layernorm_no_grad(xc, wc, bc, eps);
         }
 
-        const int64_t outer = x.numel() / last;
-        Tensor y = Tensor::empty(x.shape, x.dtype, x.device);
-        Tensor mean = Tensor::empty({outer}, x.dtype, x.device);
-        Tensor rstd = Tensor::empty({outer}, x.dtype, x.device);
-        layernorm_with_stats_no_grad(x, weight, bias, eps, y, mean, rstd);
+        const int64_t outer = xc.numel() / last;
+        Tensor y = Tensor::empty(xc.shape, xc.dtype, xc.device);
+        Tensor mean = Tensor::empty({outer}, xc.dtype, xc.device);
+        Tensor rstd = Tensor::empty({outer}, xc.dtype, xc.device);
+        layernorm_with_stats_no_grad(xc, wc, bc, eps, y, mean, rstd);
 
         auto fn = std::make_shared<LayerNormFunction>();
-        fn->record_input(x);
-        fn->record_input(weight);
-        fn->record_input(bias);
-        fn->saved_x = x;
-        fn->saved_w = weight;
+        fn->record_input(xc);
+        fn->record_input(wc);
+        fn->record_input(bc);
+        fn->saved_x = xc;
+        fn->saved_w = wc;
         fn->saved_mean = mean;
         fn->saved_rstd = rstd;
 

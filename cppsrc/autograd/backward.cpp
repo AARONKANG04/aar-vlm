@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "autograd/function.hpp"
+#include "ops/shape.hpp"
 
 namespace vlm {
     Tensor add_cuda(const Tensor& a, const Tensor& b);
@@ -20,14 +21,16 @@ namespace vlm {
             if (a.device != b.device) {
                 throw std::runtime_error("autograd: grad device mismatch");
             }
-            if (a.device == Device::CUDA) {
-                return add_cuda(a, b);
+            Tensor ac = a.is_contiguous() ? a : contiguous(a);
+            Tensor bc = b.is_contiguous() ? b : contiguous(b);
+            if (ac.device == Device::CUDA) {
+                return add_cuda(ac, bc);
             }
-            Tensor out = Tensor::empty(a.shape, a.dtype, a.device);
-            const float* ap = static_cast<const float*>(a.data());
-            const float* bp = static_cast<const float*>(b.data());
+            Tensor out = Tensor::empty(ac.shape, ac.dtype, ac.device);
+            const float* ap = static_cast<const float*>(ac.data());
+            const float* bp = static_cast<const float*>(bc.data());
             float* op = static_cast<float*>(out.data());
-            const size_t n = a.numel();
+            const size_t n = ac.numel();
             for (size_t i = 0; i < n; ++i) op[i] = ap[i] + bp[i];
             return out;
         }
@@ -38,7 +41,8 @@ namespace vlm {
             if (slot) {
                 slot = std::make_shared<Tensor>(add_grads(*slot, grad));
             } else {
-                slot = std::make_shared<Tensor>(grad);
+                slot = std::make_shared<Tensor>(
+                    grad.is_contiguous() ? grad : contiguous(grad));
             }
         }
     }

@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include "autograd/function.hpp"
+#include "ops/shape.hpp"
 
 namespace vlm {
     Tensor matmul_cuda(const Tensor& a, const Tensor& b);
@@ -12,12 +13,12 @@ namespace vlm {
 
     namespace {
         Tensor as_view(const Tensor& src, std::vector<int64_t> new_shape) {
-            Tensor v;
-            v.shape = std::move(new_shape);
-            v.dtype = src.dtype;
-            v.device = src.device;
-            v.storage = src.storage;
-            return v;
+            auto strides = compute_contiguous_strides(new_shape);
+            return make_view(src, std::move(new_shape), std::move(strides), src.storage_offset);
+        }
+
+        Tensor as_contig(const Tensor& t) {
+            return t.is_contiguous() ? t : contiguous(t);
         }
 
         Tensor matmul_cpu(const Tensor& a, const Tensor& b) {
@@ -181,15 +182,17 @@ namespace vlm {
         if (b.shape[0] != a.shape.back()) {
             throw std::invalid_argument("matmul: inner dimensions mismatch");
         }
-        if (!a.requires_grad && !b.requires_grad) {
-            return matmul_no_grad(a, b);
+        Tensor ac = as_contig(a);
+        Tensor bc = as_contig(b);
+        if (!ac.requires_grad && !bc.requires_grad) {
+            return matmul_no_grad(ac, bc);
         }
         auto fn = std::make_shared<MatmulFunction>();
-        fn->record_input(a);
-        fn->record_input(b);
-        fn->saved_a = a;
-        fn->saved_b = b;
-        Tensor out = matmul_no_grad(a, b);
+        fn->record_input(ac);
+        fn->record_input(bc);
+        fn->saved_a = ac;
+        fn->saved_b = bc;
+        Tensor out = matmul_no_grad(ac, bc);
         out.requires_grad = true;
         out.grad_fn = fn;
         return out;
@@ -208,15 +211,17 @@ namespace vlm {
         if (a.shape.back() != b.shape[1]) {
             throw std::invalid_argument("matmul_a_bt: contraction dim mismatch");
         }
-        if (!a.requires_grad && !b.requires_grad) {
-            return matmul_a_bt_no_grad(a, b);
+        Tensor ac = as_contig(a);
+        Tensor bc = as_contig(b);
+        if (!ac.requires_grad && !bc.requires_grad) {
+            return matmul_a_bt_no_grad(ac, bc);
         }
         auto fn = std::make_shared<MatmulABTFunction>();
-        fn->record_input(a);
-        fn->record_input(b);
-        fn->saved_a = a;
-        fn->saved_b = b;
-        Tensor out = matmul_a_bt_no_grad(a, b);
+        fn->record_input(ac);
+        fn->record_input(bc);
+        fn->saved_a = ac;
+        fn->saved_b = bc;
+        Tensor out = matmul_a_bt_no_grad(ac, bc);
         out.requires_grad = true;
         out.grad_fn = fn;
         return out;
@@ -235,15 +240,17 @@ namespace vlm {
         if (a.shape[0] != b.shape[0]) {
             throw std::invalid_argument("matmul_at_b: contraction dim mismatch");
         }
-        if (!a.requires_grad && !b.requires_grad) {
-            return matmul_at_b_no_grad(a, b);
+        Tensor ac = as_contig(a);
+        Tensor bc = as_contig(b);
+        if (!ac.requires_grad && !bc.requires_grad) {
+            return matmul_at_b_no_grad(ac, bc);
         }
         auto fn = std::make_shared<MatmulATBFunction>();
-        fn->record_input(a);
-        fn->record_input(b);
-        fn->saved_a = a;
-        fn->saved_b = b;
-        Tensor out = matmul_at_b_no_grad(a, b);
+        fn->record_input(ac);
+        fn->record_input(bc);
+        fn->saved_a = ac;
+        fn->saved_b = bc;
+        Tensor out = matmul_at_b_no_grad(ac, bc);
         out.requires_grad = true;
         out.grad_fn = fn;
         return out;

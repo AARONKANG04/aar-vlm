@@ -1,5 +1,6 @@
 #include "core/tensor.hpp"
 
+#include <cstdint>
 #include <cstring>
 #include <stdexcept>
 
@@ -19,6 +20,23 @@ namespace vlm {
         }
     }
 
+    std::vector<int64_t> compute_contiguous_strides(const std::vector<int64_t>& shape) {
+        std::vector<int64_t> strides(shape.size());
+        int64_t s = 1;
+        for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
+            strides[i] = s;
+            s *= shape[i];
+        }
+        return strides;
+    }
+
+    Tensor::Tensor(std::vector<int64_t> shape_, DType dtype_, Device device_)
+        : shape(std::move(shape_)),
+          strides(compute_contiguous_strides(shape)),
+          storage_offset(0),
+          dtype(dtype_),
+          device(device_) {}
+
     size_t Tensor::numel() const {
         size_t n = 1;
         for (int64_t dim : shape) {
@@ -29,6 +47,16 @@ namespace vlm {
 
     size_t Tensor::nbytes() const {
         return numel() * dtype_size(dtype);
+    }
+
+    bool Tensor::is_contiguous() const {
+        if (storage_offset != 0) return false;
+        if (strides.size() != shape.size()) return false;
+        const auto expected = compute_contiguous_strides(shape);
+        for (size_t i = 0; i < strides.size(); ++i) {
+            if (strides[i] != expected[i]) return false;
+        }
+        return true;
     }
 
     Tensor Tensor::empty(std::vector<int64_t> shape, DType dtype, Device device) {
@@ -60,6 +88,10 @@ namespace vlm {
 
     Tensor Tensor::to(Device target) const {
         if (target == device) return *this;
+        if (!is_contiguous()) {
+            throw std::runtime_error(
+                "Tensor::to: source must be contiguous; call contiguous() first");
+        }
         Tensor out = Tensor::empty(shape, dtype, target);
         copy_bytes(out.storage->data(), target,
                    storage ? storage->data() : nullptr, device,
@@ -68,11 +100,15 @@ namespace vlm {
     }
 
     void* Tensor::data() {
-        return storage ? storage->data() : nullptr;
+        if (!storage) return nullptr;
+        return static_cast<char*>(storage->data())
+               + static_cast<size_t>(storage_offset) * dtype_size(dtype);
     }
 
     const void* Tensor::data() const {
-        return storage ? storage->data() : nullptr;
+        if (!storage) return nullptr;
+        return static_cast<const char*>(storage->data())
+               + static_cast<size_t>(storage_offset) * dtype_size(dtype);
     }
 
     Tensor& Tensor::set_requires_grad(bool req) {

@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "autograd/function.hpp"
+#include "ops/shape.hpp"
 
 namespace vlm {
     Tensor softmax_cuda(const Tensor& x);
@@ -81,12 +82,13 @@ namespace vlm {
         if (x.shape.back() == 0) {
             throw std::invalid_argument("softmax: last dim must be > 0");
         }
-        if (!x.requires_grad) {
-            return softmax_no_grad(x);
+        Tensor xc = x.is_contiguous() ? x : contiguous(x);
+        if (!xc.requires_grad) {
+            return softmax_no_grad(xc);
         }
         auto fn = std::make_shared<SoftmaxFunction>();
-        fn->record_input(x);
-        Tensor out = softmax_no_grad(x);
+        fn->record_input(xc);
+        Tensor out = softmax_no_grad(xc);
         fn->saved_y = out;
         out.requires_grad = true;
         out.grad_fn = fn;

@@ -121,20 +121,21 @@ class MultiHeadAttention(Module):
         self.d_head = d_model // n_heads
         self.causal = causal
         rng = rng if rng is not None else np.random.default_rng()
-        self.q_proj = Linear(d_model, d_model, bias=bias, rng=rng)
-        self.k_proj = Linear(d_model, d_model, bias=bias, rng=rng)
-        self.v_proj = Linear(d_model, d_model, bias=bias, rng=rng)
+        self.qkv_proj = Linear(d_model, 3 * d_model, bias=bias, rng=rng)
         self.out_proj = Linear(d_model, d_model, bias=bias, rng=rng)
 
-    def _split(self, t, B, T):
-        t = _core.reshape(t, [B, T, self.n_heads, self.d_head])
-        return _core.transpose(t, 1, 2)
+    def _take(self, qkv, idx):
+        s = _core.slice(qkv, 2, idx, idx + 1)
+        s = _core.squeeze(s, 2)
+        return _core.transpose(s, 1, 2)
 
     def forward(self, x):
         B, T, _ = x.shape
-        q = self._split(self.q_proj(x), B, T)
-        k = self._split(self.k_proj(x), B, T)
-        v = self._split(self.v_proj(x), B, T)
+        qkv = self.qkv_proj(x)
+        qkv = _core.reshape(qkv, [B, T, 3, self.n_heads, self.d_head])
+        q = self._take(qkv, 0)
+        k = self._take(qkv, 1)
+        v = self._take(qkv, 2)
         scores = _core.scale(_core.bmm_a_bt(q, k), 1.0 / math.sqrt(self.d_head))
         if self.causal:
             scores = _core.apply_causal_mask(scores)
