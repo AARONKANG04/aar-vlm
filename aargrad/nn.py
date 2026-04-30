@@ -15,6 +15,7 @@ class Module:
     def __init__(self):
         object.__setattr__(self, "_parameters", {})
         object.__setattr__(self, "_modules", {})
+        object.__setattr__(self, "training", True)
 
     def __setattr__(self, name, value):
         if isinstance(value, Parameter):
@@ -41,6 +42,15 @@ class Module:
         for m in self._modules.values():
             m.to(device)
         return self
+
+    def train(self, mode=True):
+        self.training = mode
+        for m in self._modules.values():
+            m.train(mode)
+        return self
+
+    def eval(self):
+        return self.train(False)
 
     def forward(self, *args, **kwargs):
         raise NotImplementedError
@@ -103,6 +113,19 @@ class ReLU(Module):
 class GELU(Module):
     def forward(self, x):
         return _core.gelu(x)
+
+
+class Dropout(Module):
+    def __init__(self, p=0.5):
+        super().__init__()
+        if not 0.0 <= p < 1.0:
+            raise ValueError("Dropout: p must be in [0, 1)")
+        self.p = p
+
+    def forward(self, x):
+        if not self.training or self.p == 0.0:
+            return x
+        return _core.dropout(x, self.p)
 
 
 class LayerNorm(Module):

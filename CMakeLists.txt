@@ -62,6 +62,7 @@ set(VLM_CORE_SOURCES
     cppsrc/ops/bmm.cpp
     cppsrc/ops/embedding.cpp
     cppsrc/ops/cross_entropy.cpp
+    cppsrc/ops/dropout.cpp
 )
 
 if(HAS_CUDA)
@@ -77,6 +78,7 @@ if(HAS_CUDA)
         cppsrc/ops/bmm.cu
         cppsrc/ops/embedding.cu
         cppsrc/ops/cross_entropy.cu
+        cppsrc/ops/dropout.cu
     )
 else()
     list(APPEND VLM_CORE_SOURCES
@@ -91,6 +93,7 @@ else()
         cppsrc/ops/bmm_cuda_stub.cpp
         cppsrc/ops/embedding_cuda_stub.cpp
         cppsrc/ops/cross_entropy_cuda_stub.cpp
+        cppsrc/ops/dropout_cuda_stub.cpp
     )
 endif()
 

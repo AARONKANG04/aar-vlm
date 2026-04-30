@@ -29,6 +29,8 @@ from ._core import (
     bmm_at_b,
     embedding,
     cross_entropy,
+    dropout,
+    manual_seed,
     scaled_add_inplace,
 )
 
@@ -66,6 +68,8 @@ __all__ = [
     "bmm_at_b",
     "embedding",
     "cross_entropy",
+    "dropout",
+    "manual_seed",
     "scaled_add_inplace",
     "nn",
     "optim",

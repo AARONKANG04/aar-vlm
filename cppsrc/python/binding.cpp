@@ -18,6 +18,7 @@
 #include "ops/bmm.hpp"
 #include "ops/embedding.hpp"
 #include "ops/cross_entropy.hpp"
+#include "ops/dropout.hpp"
 
 namespace py = pybind11;
 using namespace vlm;
@@ -153,4 +154,6 @@ PYBIND11_MODULE(_core, m) {
     m.def("cross_entropy", &cross_entropy,
           py::arg("logits"), py::arg("targets"),
           py::arg("ignore_index") = -100, gil_release());
+    m.def("dropout", &dropout, py::arg("x"), py::arg("p"), gil_release());
+    m.def("manual_seed", &manual_seed, py::arg("seed"));
 }
