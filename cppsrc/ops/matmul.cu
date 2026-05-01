@@ -305,18 +305,33 @@ namespace vlm {
         auto blocks = [&](int bm, int bn) {
             return ((M + bm - 1) / bm) * ((N + bn - 1) / bn);
         };
-        if (blocks(128, 128) >= SM_TARGET) {
-            constexpr int BM = 128, BN = 128, TM = 8, TN = 8;
+        const int small = std::min(M, N);
+
+        int tile;
+        if (small <= 128) {
+            tile = 32;
+        } else if (small <= 384 && blocks(64, 64) >= SM_TARGET) {
+            tile = 64;
+        } else if (blocks(128, 128) >= 2 * SM_TARGET) {
+            tile = 128;
+        } else if (blocks(64, 64) >= SM_TARGET) {
+            tile = 64;
+        } else {
+            tile = 32;
+        }
+
+        if (tile == 32) {
+            constexpr int BM = 32, BN = 32, TM = 2, TN = 2;
             dim3 block(BN / TN, BM / TM);
             dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
             matmul_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block, 0, stream>>>(A, B, C, M, N, K);
-        } else if (blocks(64, 64) >= SM_TARGET) {
+        } else if (tile == 64) {
             constexpr int BM = 64, BN = 64, TM = 4, TN = 4;
             dim3 block(BN / TN, BM / TM);
             dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
             matmul_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block, 0, stream>>>(A, B, C, M, N, K);
         } else {
-            constexpr int BM = 32, BN = 32, TM = 2, TN = 2;
+            constexpr int BM = 128, BN = 128, TM = 8, TN = 8;
             dim3 block(BN / TN, BM / TM);
             dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
             matmul_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block, 0, stream>>>(A, B, C, M, N, K);
