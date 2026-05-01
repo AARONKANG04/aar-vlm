@@ -24,6 +24,7 @@ namespace vlm {
     void matmul_v1_launch(const float*, const float*, float*, int, int, int, cudaStream_t);
     void matmul_v2_launch(const float*, const float*, float*, int, int, int, cudaStream_t);
     void matmul_v3_launch(const float*, const float*, float*, int, int, int, cudaStream_t);
+    void matmul_v4_launch(const float*, const float*, float*, int, int, int, cudaStream_t);
 }
 
 struct Shape {
@@ -180,6 +181,7 @@ int main(int argc, char** argv) {
         {"v1", vlm::matmul_v1_launch},
         {"v2", vlm::matmul_v2_launch},
         {"v3", vlm::matmul_v3_launch},
+        {"v4", vlm::matmul_v4_launch},
     };
 
     auto csv_dir = std::filesystem::path(csv_path).parent_path();
