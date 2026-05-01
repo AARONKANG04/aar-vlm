@@ -1,22 +1,13 @@
 #include "ops/matmul.hpp"
 
+#include <algorithm>
 #include <cuda_runtime.h>
 
 #include "core/cuda_check.hpp"
 
 namespace vlm {
     namespace {
-        constexpr int BM = 128;
-        constexpr int BN = 128;
-        constexpr int BK = 16;
-        constexpr int TM = 8;
-        constexpr int TN = 8;
-        constexpr int TX = BN / TN;
-        constexpr int TY = BM / TM;
-        constexpr int THREADS = TX * TY;
-        constexpr int A_LOADS = (BM * BK) / THREADS;
-        constexpr int B_LOADS = (BK * BN) / THREADS;
-
+        template <int BM, int BN, int BK, int TM, int TN>
         __device__ __forceinline__ void mma_compute(
                 const float (&As)[BM][BK],
                 const float (&Bs)[BK][BN],
@@ -40,6 +31,7 @@ namespace vlm {
             }
         }
 
+        template <int BM, int BN, int TM, int TN>
         __device__ __forceinline__ void write_back(
                 float* C, int M, int N,
                 int by, int bx, int ty, int tx,
@@ -58,11 +50,20 @@ namespace vlm {
             }
         }
 
+        template <int BM, int BN, int BK, int TM, int TN>
         __global__ void matmul_tiled_kernel(
                 const float* __restrict__ A,
                 const float* __restrict__ B,
                 float* __restrict__ C,
                 int M, int N, int K) {
+            constexpr int TX = BN / TN;
+            constexpr int TY = BM / TM;
+            constexpr int THREADS = TX * TY;
+            constexpr int A_LOADS = (BM * BK) / THREADS;
+            constexpr int B_LOADS = (BK * BN) / THREADS;
+            static_assert((BM * BK) % THREADS == 0, "BM*BK must be divisible by THREADS");
+            static_assert((BK * BN) % THREADS == 0, "BK*BN must be divisible by THREADS");
+
             __shared__ float As[BM][BK];
             __shared__ float Bs[BK][BN];
 
@@ -102,18 +103,27 @@ namespace vlm {
                 }
                 __syncthreads();
 
-                mma_compute(As, Bs, ty, tx, acc);
+                mma_compute<BM, BN, BK, TM, TN>(As, Bs, ty, tx, acc);
                 __syncthreads();
             }
 
-            write_back(C, M, N, by, bx, ty, tx, acc);
+            write_back<BM, BN, TM, TN>(C, M, N, by, bx, ty, tx, acc);
         }
 
+        template <int BM, int BN, int BK, int TM, int TN>
         __global__ void matmul_a_bt_tiled_kernel(
                 const float* __restrict__ A,
                 const float* __restrict__ B,
                 float* __restrict__ C,
                 int M, int N, int K) {
+            constexpr int TX = BN / TN;
+            constexpr int TY = BM / TM;
+            constexpr int THREADS = TX * TY;
+            constexpr int A_LOADS = (BM * BK) / THREADS;
+            constexpr int B_LOADS = (BK * BN) / THREADS;
+            static_assert((BM * BK) % THREADS == 0, "BM*BK must be divisible by THREADS");
+            static_assert((BK * BN) % THREADS == 0, "BK*BN must be divisible by THREADS");
+
             __shared__ float As[BM][BK];
             __shared__ float Bs[BK][BN];
 
@@ -153,18 +163,27 @@ namespace vlm {
                 }
                 __syncthreads();
 
-                mma_compute(As, Bs, ty, tx, acc);
+                mma_compute<BM, BN, BK, TM, TN>(As, Bs, ty, tx, acc);
                 __syncthreads();
             }
 
-            write_back(C, M, N, by, bx, ty, tx, acc);
+            write_back<BM, BN, TM, TN>(C, M, N, by, bx, ty, tx, acc);
         }
 
+        template <int BM, int BN, int BK, int TM, int TN>
         __global__ void matmul_at_b_tiled_kernel(
                 const float* __restrict__ A,
                 const float* __restrict__ B,
                 float* __restrict__ C,
                 int M, int N, int K) {
+            constexpr int TX = BN / TN;
+            constexpr int TY = BM / TM;
+            constexpr int THREADS = TX * TY;
+            constexpr int A_LOADS = (BM * BK) / THREADS;
+            constexpr int B_LOADS = (BK * BN) / THREADS;
+            static_assert((BM * BK) % THREADS == 0, "BM*BK must be divisible by THREADS");
+            static_assert((BK * BN) % THREADS == 0, "BK*BN must be divisible by THREADS");
+
             __shared__ float As[BM][BK];
             __shared__ float Bs[BK][BN];
 
@@ -204,11 +223,11 @@ namespace vlm {
                 }
                 __syncthreads();
 
-                mma_compute(As, Bs, ty, tx, acc);
+                mma_compute<BM, BN, BK, TM, TN>(As, Bs, ty, tx, acc);
                 __syncthreads();
             }
 
-            write_back(C, M, N, by, bx, ty, tx, acc);
+            write_back<BM, BN, TM, TN>(C, M, N, by, bx, ty, tx, acc);
         }
     }
 
@@ -219,9 +238,10 @@ namespace vlm {
 
         Tensor out = Tensor::empty({M, N}, a.dtype, Device::CUDA);
 
-        dim3 block(TX, TY);
+        constexpr int BM = 128, BN = 128, TM = 8, TN = 8;
+        dim3 block(BN / TN, BM / TM);
         dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
-        matmul_tiled_kernel<<<grid, block>>>(
+        matmul_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block>>>(
             static_cast<const float*>(a.data()),
             static_cast<const float*>(b.data()),
             static_cast<float*>(out.data()),
@@ -238,9 +258,10 @@ namespace vlm {
 
         Tensor out = Tensor::empty({M, N}, a.dtype, Device::CUDA);
 
-        dim3 block(TX, TY);
+        constexpr int BM = 128, BN = 128, TM = 8, TN = 8;
+        dim3 block(BN / TN, BM / TM);
         dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
-        matmul_a_bt_tiled_kernel<<<grid, block>>>(
+        matmul_a_bt_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block>>>(
             static_cast<const float*>(a.data()),
             static_cast<const float*>(b.data()),
             static_cast<float*>(out.data()),
@@ -257,9 +278,10 @@ namespace vlm {
 
         Tensor out = Tensor::empty({M, N}, a.dtype, Device::CUDA);
 
-        dim3 block(TX, TY);
+        constexpr int BM = 128, BN = 128, TM = 8, TN = 8;
+        dim3 block(BN / TN, BM / TM);
         dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
-        matmul_at_b_tiled_kernel<<<grid, block>>>(
+        matmul_at_b_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block>>>(
             static_cast<const float*>(a.data()),
             static_cast<const float*>(b.data()),
             static_cast<float*>(out.data()),
@@ -271,8 +293,30 @@ namespace vlm {
 
     void matmul_v1_launch(const float* A, const float* B, float* C,
                           int M, int N, int K, cudaStream_t stream) {
-        dim3 block(TX, TY);
+        constexpr int BM = 128, BN = 128, TM = 8, TN = 8;
+        dim3 block(BN / TN, BM / TM);
         dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
-        matmul_tiled_kernel<<<grid, block, 0, stream>>>(A, B, C, M, N, K);
+        matmul_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block, 0, stream>>>(A, B, C, M, N, K);
+    }
+
+    void matmul_v2_launch(const float* A, const float* B, float* C,
+                          int M, int N, int K, cudaStream_t stream) {
+        const int s = std::min(M, N);
+        if (s <= 128) {
+            constexpr int BM = 32, BN = 32, TM = 2, TN = 2;
+            dim3 block(BN / TN, BM / TM);
+            dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
+            matmul_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block, 0, stream>>>(A, B, C, M, N, K);
+        } else if (s <= 384) {
+            constexpr int BM = 64, BN = 64, TM = 4, TN = 4;
+            dim3 block(BN / TN, BM / TM);
+            dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
+            matmul_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block, 0, stream>>>(A, B, C, M, N, K);
+        } else {
+            constexpr int BM = 128, BN = 128, TM = 8, TN = 8;
+            dim3 block(BN / TN, BM / TM);
+            dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
+            matmul_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block, 0, stream>>>(A, B, C, M, N, K);
+        }
     }
 }
