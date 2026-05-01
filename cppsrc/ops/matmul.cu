@@ -268,4 +268,11 @@ namespace vlm {
         CUDA_CHECK(cudaDeviceSynchronize());
         return out;
     }
+
+    void matmul_v1_launch(const float* A, const float* B, float* C,
+                          int M, int N, int K, cudaStream_t stream) {
+        dim3 block(TX, TY);
+        dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
+        matmul_tiled_kernel<<<grid, block, 0, stream>>>(A, B, C, M, N, K);
+    }
 }

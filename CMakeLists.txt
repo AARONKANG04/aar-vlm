@@ -154,3 +154,11 @@ if(BUILD_PYTHON)
     target_link_libraries(_core PRIVATE vlm_core)
     install(TARGETS _core LIBRARY DESTINATION aargrad)
 endif()
+
+option(BUILD_BENCH "Build benchmarks" OFF)
+
+if(HAS_CUDA AND BUILD_BENCH)
+    add_executable(bench_matmul bench/bench_matmul.cu)
+    target_link_libraries(bench_matmul PRIVATE vlm_core CUDA::cublas CUDA::curand)
+    set_target_properties(bench_matmul PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+endif()
