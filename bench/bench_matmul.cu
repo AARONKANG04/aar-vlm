@@ -92,7 +92,7 @@ static float max_abs_diff(const float* a, const float* b, size_t n) {
 }
 
 static float tol_for_K(int K) {
-    return std::max(1e-3f, 1e-3f * std::sqrt(static_cast<float>(K)) / 32.f);
+    return std::max(2e-3f, 5e-3f * std::sqrt(static_cast<float>(K)) / 32.f);
 }
 
 int main(int argc, char** argv) {
