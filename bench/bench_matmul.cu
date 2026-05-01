@@ -13,12 +13,12 @@
 #include <string>
 #include <vector>
 
-#define CUDA_CHECK(x) do { cudaError_t e = (x); if (e != cudaSuccess) { \
-    std::fprintf(stderr, "CUDA %s @ %s:%d\n", cudaGetErrorString(e), __FILE__, __LINE__); std::exit(1); } } while (0)
-#define CUBLAS_CHECK(x) do { cublasStatus_t s = (x); if (s != CUBLAS_STATUS_SUCCESS) { \
-    std::fprintf(stderr, "cuBLAS %d @ %s:%d\n", (int)s, __FILE__, __LINE__); std::exit(1); } } while (0)
-#define CURAND_CHECK(x) do { curandStatus_t s = (x); if (s != CURAND_STATUS_SUCCESS) { \
-    std::fprintf(stderr, "cuRAND %d @ %s:%d\n", (int)s, __FILE__, __LINE__); std::exit(1); } } while (0)
+#define CUDA_CHECK(x) do { cudaError_t _cu_err_ = (x); if (_cu_err_ != cudaSuccess) { \
+    std::fprintf(stderr, "CUDA %s @ %s:%d\n", cudaGetErrorString(_cu_err_), __FILE__, __LINE__); std::exit(1); } } while (0)
+#define CUBLAS_CHECK(x) do { cublasStatus_t _cublas_err_ = (x); if (_cublas_err_ != CUBLAS_STATUS_SUCCESS) { \
+    std::fprintf(stderr, "cuBLAS %d @ %s:%d\n", (int)_cublas_err_, __FILE__, __LINE__); std::exit(1); } } while (0)
+#define CURAND_CHECK(x) do { curandStatus_t _curand_err_ = (x); if (_curand_err_ != CURAND_STATUS_SUCCESS) { \
+    std::fprintf(stderr, "cuRAND %d @ %s:%d\n", (int)_curand_err_, __FILE__, __LINE__); std::exit(1); } } while (0)
 
 namespace vlm {
     void matmul_v1_launch(const float*, const float*, float*, int, int, int, cudaStream_t);
