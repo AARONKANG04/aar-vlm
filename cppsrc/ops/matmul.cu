@@ -301,19 +301,22 @@ namespace vlm {
 
     void matmul_v2_launch(const float* A, const float* B, float* C,
                           int M, int N, int K, cudaStream_t stream) {
-        const int s = std::min(M, N);
-        if (s <= 128) {
-            constexpr int BM = 32, BN = 32, TM = 2, TN = 2;
+        constexpr int SM_TARGET = 108;
+        auto blocks = [&](int bm, int bn) {
+            return ((M + bm - 1) / bm) * ((N + bn - 1) / bn);
+        };
+        if (blocks(128, 128) >= SM_TARGET) {
+            constexpr int BM = 128, BN = 128, TM = 8, TN = 8;
             dim3 block(BN / TN, BM / TM);
             dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
             matmul_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block, 0, stream>>>(A, B, C, M, N, K);
-        } else if (s <= 384) {
+        } else if (blocks(64, 64) >= SM_TARGET) {
             constexpr int BM = 64, BN = 64, TM = 4, TN = 4;
             dim3 block(BN / TN, BM / TM);
             dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
             matmul_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block, 0, stream>>>(A, B, C, M, N, K);
         } else {
-            constexpr int BM = 128, BN = 128, TM = 8, TN = 8;
+            constexpr int BM = 32, BN = 32, TM = 2, TN = 2;
             dim3 block(BN / TN, BM / TM);
             dim3 grid((N + BN - 1) / BN, (M + BM - 1) / BM);
             matmul_tiled_kernel<BM, BN, 16, TM, TN><<<grid, block, 0, stream>>>(A, B, C, M, N, K);
