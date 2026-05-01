@@ -7,6 +7,10 @@
 #include <sstream>
 #include <stdexcept>
 
+#ifdef HAS_CUDA
+#include <cuda_runtime.h>
+#endif
+
 #include "core/tensor.hpp"
 #include "core/types.hpp"
 #include "ops/elementwise.hpp"
@@ -53,6 +57,15 @@ std::shared_ptr<Tensor> from_numpy(py::array arr, bool requires_grad) {
     t->set_requires_grad(requires_grad);
     std::memcpy(t->data(), contig.data(), t->nbytes());
     return t;
+}
+
+void cuda_synchronize() {
+#ifdef HAS_CUDA
+    cudaError_t err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        throw std::runtime_error(std::string("cudaDeviceSynchronize: ") + cudaGetErrorString(err));
+    }
+#endif
 }
 
 py::array to_numpy(const Tensor& t) {
@@ -121,6 +134,7 @@ PYBIND11_MODULE(_core, m) {
 
     m.def("from_numpy", &from_numpy, py::arg("array"), py::arg("requires_grad") = false);
     m.def("to_numpy", &to_numpy, py::arg("tensor"));
+    m.def("cuda_synchronize", &cuda_synchronize, gil_release());
 
     m.def("add", &add, gil_release());
     m.def("sub", &sub, gil_release());

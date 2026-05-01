@@ -34,6 +34,7 @@ from ._core import (
     scaled_add_inplace,
     adamw_step,
     flash_attention,
+    cuda_synchronize,
 )
 
 from . import nn
@@ -75,6 +76,7 @@ __all__ = [
     "scaled_add_inplace",
     "adamw_step",
     "flash_attention",
+    "cuda_synchronize",
     "nn",
     "optim",
 ]

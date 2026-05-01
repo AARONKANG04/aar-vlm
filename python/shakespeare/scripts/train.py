@@ -1,5 +1,8 @@
 import argparse
 import json
+import time
+from collections import defaultdict
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +14,53 @@ from aargrad.optim import AdamW
 
 from data import CharTokenizer, TokenWindowDataset, DataLoader
 from model import GPT
+
+
+class StageTimer:
+    def __init__(self, sync_fn, warmup):
+        self._sync = sync_fn
+        self._warmup = warmup
+        self._times = defaultdict(list)
+        self._counts = defaultdict(int)
+        self._order = []
+
+    @contextmanager
+    def __call__(self, name):
+        if name not in self._counts:
+            self._order.append(name)
+        self._sync()
+        t0 = time.perf_counter()
+        try:
+            yield
+        finally:
+            self._sync()
+            dt_ms = (time.perf_counter() - t0) * 1000.0
+            self._counts[name] += 1
+            if self._counts[name] > self._warmup:
+                self._times[name].append(dt_ms)
+
+    def report(self):
+        if not self._times:
+            print("no profile data")
+            return
+        n = min(len(self._times[k]) for k in self._order)
+        per_step_total = [sum(self._times[k][i] for k in self._order) for i in range(n)]
+
+        def stats(values):
+            v = sorted(values)
+            med = v[len(v) // 2]
+            p99 = v[min(len(v) - 1, int(len(v) * 0.99))]
+            return med, p99
+
+        total_med, total_p99 = stats(per_step_total)
+        print()
+        print(f"{'stage':<12} {'ms_med':>10} {'%':>6}  {'ms_p99':>10}")
+        for name in self._order:
+            med, p99 = stats(self._times[name])
+            pct = (med / total_med * 100.0) if total_med else 0.0
+            print(f"{name:<12} {med:>10.3f} {pct:>5.1f}  {p99:>10.3f}")
+        print("-" * 42)
+        print(f"{'total':<12} {total_med:>10.3f} {100.0:>5.1f}  {total_p99:>10.3f}")
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_DATA_DIR = SCRIPT_DIR.parent / "data"
@@ -37,6 +87,9 @@ def parse_args():
     p.add_argument("--eval-batches", type=int, default=20)
     p.add_argument("--log-interval", type=int, default=20)
     p.add_argument("--save-interval", type=int, default=500)
+    p.add_argument("--profile", action="store_true", help="profile training step stages then exit")
+    p.add_argument("--profile-warmup", type=int, default=10)
+    p.add_argument("--profile-steps", type=int, default=50)
     return p.parse_args()
 
 
@@ -126,6 +179,27 @@ def main():
     print(f"train tokens: {len(train_tokens):,} | val tokens: {len(val_tokens):,}")
 
     train_iter = cycle(train_loader)
+
+    if args.profile:
+        timer = StageTimer(ag.cuda_synchronize, warmup=args.profile_warmup)
+        n_total = args.profile_warmup + args.profile_steps
+        pbar = tqdm(range(1, n_total + 1), desc="profile", dynamic_ncols=True)
+        for _ in pbar:
+            batch = next(train_iter)
+            x, y = to_device_batch(batch, device)
+
+            with timer("forward"):
+                logits = model(x)
+            with timer("loss"):
+                loss = ce(logits, y)
+            with timer("backward"):
+                optimizer.zero_grad()
+                loss.backward()
+            with timer("optimizer"):
+                optimizer.step()
+        timer.report()
+        return
+
     pbar = tqdm(range(1, args.max_iters + 1), desc="train", dynamic_ncols=True)
     for it in pbar:
         batch = next(train_iter)
